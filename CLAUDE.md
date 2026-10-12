@@ -203,6 +203,58 @@ User can deploy Netlify only a few times but can run SQL freely → **build/veri
 - **Pending SQL:** run **`supabase/RUN-ALL-new-features.sql`** — a single combined file with all of it (variants+stock, pre-loved + its 1-of-1 unit columns `color/chassis_no/battery_no/motor_no/sold`, unit details+acquired date, messages). Re-running is safe (idempotent), so if you ran an earlier version just run it again for the new pre-loved columns. Individual files (`variants.sql`, `ebike-details.sql`, `preloved.sql`, `preloved-details.sql`, `unit-acquired.sql`, `messages.sql`) remain for reference. NOTE: adding a customer unit now always sends the new `user_ebikes` columns (incl. `acquired_at`), so `ebike-details.sql` **and** `unit-acquired.sql` must be run or unit-add fails.
 
 ## Recent changes log
+- 2026-10-12: **Capstone panel revisions (18 items) + GitHub versioning.** Applied the panel's
+  revisions without removing features. **NEW SQL (pending user run): `supabase/panel-revisions.sql`**
+  — adds `users.must_change_password` (bool) + `repairs.branch` (text); idempotent, backfills
+  repair branch from the owning customer. **All new writes RETRY without the new columns if the SQL
+  isn't run yet** (`api.js` createUser/createRepair/changePassword), so nothing breaks pre-migration
+  (the features are simply inert until the columns exist — verified both columns are currently absent
+  on live Supabase). Changes by number:
+  - **#1 Required-field red `*`** — `markRequired()` + a `MutationObserver` in BOTH `app.js`/`staff.js`
+    wraps each required label's text + a `.req` star in a `.req-line` span (labels are flex-column, so
+    the wrapper keeps "Label *" on one line). Observer-driven → covers dynamically-rendered forms.
+  - **#3 All nav in a LEFT sidebar (public)** — `index.html` header replaced with a left hamburger
+    (`#navDrawerBtn`) + `#publicDrawer`/`#publicScrim` reusing the staff `.drawer` CSS. Holds Browse +
+    (guest) Login/Create account + (member) all account items. `body.logged-in` toggles guest/member
+    via CSS (`.guest-only`/`.member-only`). Old top-nav + guest/member dropdowns removed; `wireLogin`
+    rewritten (`openPublicDrawer`/`closePublicDrawer`), `wireNav` reduced to the scroll-shadow.
+  - **#4** save/update buttons → `btn-primary full` (e.g. profile "Update password"). **#6** customer
+    messaging label standardized to "Messages" (staff surface stays "Inbox").
+  - **#7 Confirm dialog** — shared `confirmAction()` styled modal in both files; replaces the 9 native
+    `confirm()` calls and gates create/update/save/delete/cancel/book/signup (NOT login/search/filter).
+  - **#8 Temp-password forced change** — `createUser` stamps `must_change_password` (staff/admin-made
+    accounts; self-signup passes `mustChange:false`); `changePassword`/`setNewPassword` clear it;
+    `API.resetPassword`. Blocking "set a new password" screen: customer via `forcePasswordChange`
+    (`refreshAuthUI`), staff/admin via `forceStaffPasswordChange` (staff `init`, reloads after).
+  - **#9** member/customer ID removed from the account hero + profile sub (kept in the staff portal).
+  - **#10** admin can now manage repairs (`canEdit=true` on repair rows + create-on-behalf); admin
+    login routes to `staff.html`. **#11** per-branch operating hours: `#branchHoursEditor` in Site
+    Settings → `site_settings.branch_hours` JSON (no SQL); `app.js` overrides `C.branches[k].hours`
+    (Location page already prints it).
+  - **#12** staff/admin **➕ New repair** (`openNewRepair`) — pick customer → their e-bike → date
+    (min today) → slot (availability-checked) → type/notes; sets `repairs.branch`.
+  - **#13 Booking calendar** — `panelSchedule` now renders a month calendar (`renderBookingCalendar`):
+    past days greyed/disabled, fully-booked days red "Full"/disabled, free days selectable → slot
+    dropdown. `API.getBookedSlotsRange` (one query/month); cancelled repairs now free their slot.
+  - **#14** past dates unselectable (calendar + `min=today` on staff repair-edit/new-repair).
+  - **#15** upcoming-repair reminder banner (`upcomingReminderHtml`) on the account dashboard +
+    schedule panel. **#16** notification bell (`#notifBell`) on both headers — localStorage snapshot
+    diff of repairs → new/changed items (customer: own; staff/admin: branch). **#17** last repair
+    (date + branch) on the customer dashboard + each customer in the staff Users list.
+  - **#18/#19** `content.json` maintenance split into `basic`/`detailed` arrays + a `source` citation;
+    `panelMaintenance()` renders 📋 Basic / 🔧 Detailed + "provided by the Lucky Lion main shop".
+    (Verified no "Maintence" misspelling exists — heading was already "General Maintenance".)
+  - **Verified in-browser** (extension online): no console errors on public/staff/admin; left drawer,
+    required asterisks (observer), confirm dialog, booking calendar + slot loading + booking confirm,
+    maintenance sections, customer dashboard (no ID, last-repair), bell, branch-hours editor, and the
+    column-missing write retry (created+deleted a live repair). Cache-bust bumped
+    `20260929a`→**`20261012a`** (styles.css both; app.js+api.js index; staff.js+api.js staff).
+    `deploy/` synced (mirror verified) + `lucky-lion-site.zip` rebuilt (index.html at root). JS
+    parse-checked; CSS braces balanced. **Versioning:** project put under git (tag `v1.0.0` = pre-
+    revision baseline, `v2.0.0` = these revisions) to push to `git@github.com:raymondrsadsad/lucky-lion-ebike.git`
+    (mirrors the wtrlab-epub-extension setup); local backup zip in the parent folder. **PENDING USER
+    ACTION:** (1) create the empty private GitHub repo so the tags can push; (2) run
+    `supabase/panel-revisions.sql`; (3) drag `lucky-lion-site.zip` to Netlify.
 - 2026-09-29 (a): **Panelist UI fix batch (6 mobile-focused fixes, no SQL).** From live-demo
   feedback: (1) **Customer Messages composer overflow** — the Send button was pushed off the
   right edge on mobile (flexbox `min-width:auto`). Fixed in `css/styles.css` `.chat-form`: added

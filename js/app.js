@@ -24,6 +24,73 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<':
 // nt(): escape + wrap a proper noun (branch / model / brand name) so Google Translate won't mangle it
 const nt = (s) => `<span translate="no">${esc(s)}</span>`;
 
+/* ---------- #1: red asterisk on required fields ---------- */
+// Insert a red * right after the label text for any label wrapping a required control.
+// Idempotent + driven by a MutationObserver so dynamically-rendered forms get marked too.
+function markRequired(root = document) {
+  root.querySelectorAll('label').forEach(label => {
+    const ctrl = label.querySelector(':scope > input[required], :scope > select[required], :scope > textarea[required]');
+    if (!ctrl) return;
+    if (label.querySelector(':scope > .req-line')) return;          // already marked
+    const first = label.firstChild;                                  // the leading label text node
+    if (!first || first.nodeType !== 3 || !first.textContent.trim()) return;
+    // wrap "label text" + "*" in ONE inline span so they share a line (labels are flex-column)
+    const line = document.createElement('span');
+    line.className = 'req-line';
+    label.insertBefore(line, first);
+    line.appendChild(first);
+    const star = document.createElement('span');
+    star.className = 'req'; star.textContent = ' *';
+    star.setAttribute('aria-hidden', 'true'); star.title = 'required';
+    line.appendChild(star);
+  });
+}
+let _reqObsTimer = null;
+function startRequiredObserver() {
+  markRequired();
+  const obs = new MutationObserver(() => {
+    clearTimeout(_reqObsTimer);
+    _reqObsTimer = setTimeout(() => markRequired(), 80);
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+}
+
+/* ---------- #7: styled confirmation dialog (replaces native confirm) ---------- */
+// Resolves true on Confirm, false on Cancel / backdrop. Use before data-changing actions.
+let _confirmHost = null;
+function confirmAction(message, opts = {}) {
+  const { title = 'Please confirm', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = opts;
+  return new Promise(resolve => {
+    if (!_confirmHost) {
+      _confirmHost = document.createElement('div');
+      _confirmHost.className = 'modal-backdrop hidden confirm-backdrop';
+      _confirmHost.innerHTML = `<div class="modal modal-sm" role="dialog" aria-modal="true">
+        <h3 class="modal-title" id="confirmTitle"></h3>
+        <p class="modal-note" id="confirmMsg"></p>
+        <div class="confirm-actions">
+          <button type="button" class="btn btn-ghost" id="confirmNo"></button>
+          <button type="button" class="btn btn-primary" id="confirmYes"></button>
+        </div></div>`;
+      document.body.appendChild(_confirmHost);
+    }
+    const host = _confirmHost;
+    host.querySelector('#confirmTitle').textContent = title;
+    host.querySelector('#confirmMsg').textContent = message;
+    const yes = host.querySelector('#confirmYes'), no = host.querySelector('#confirmNo');
+    yes.textContent = confirmLabel; no.textContent = cancelLabel;
+    yes.classList.toggle('btn-danger', !!danger);
+    host.classList.remove('hidden'); document.body.style.overflow = 'hidden';
+    const done = (val) => {
+      host.classList.add('hidden'); document.body.style.overflow = '';
+      yes.onclick = no.onclick = host.onclick = null;
+      resolve(val);
+    };
+    yes.onclick = () => done(true);
+    no.onclick = () => done(false);
+    host.onclick = (e) => { if (e.target === host) done(false); };
+  });
+}
+
 let C = {};        // content.json cache
 let MODELS = [];   // effective models (base products.json + staff model_meta)
 let MY_EBIKES = []; // the signed-in customer's owned units (full rows, incl. serials)
@@ -102,6 +169,12 @@ async function init() {
       if (String(bm[k].maps || '').trim()) C.branches[k].maps = String(bm[k].maps).trim();
     });
   } catch { }
+  // #11: per-branch operating hours (admin-editable in Site Settings) override content.json;
+  // shown on the Location page per branch.
+  try {
+    const bh = JSON.parse(settings.branch_hours || '{}') || {};
+    Object.keys(bh).forEach(k => { if (C.branches[k] && String(bh[k] || '').trim()) C.branches[k].hours = String(bh[k]).trim(); });
+  } catch { }
   C.home.contacts = parseContacts(settings, C.home);
   const firstNum = primaryNumber();                    // main branch number = the site default
   if (firstNum) C.home.phone = firstNum;
@@ -152,21 +225,12 @@ async function init() {
   wireNav();
   await refreshAuthUI();
   setupAnimations();
+  startRequiredObserver();   // #1: red * on required fields (incl. dynamically-rendered forms)
 }
 
-/* ---------------- mobile nav + scroll animations ---------------- */
+/* ---------------- header scroll shadow ---------------- */
 function wireNav() {
-  const toggle = $('#navToggle'), nav = $('#primaryNav');
-  const close = () => { nav.classList.remove('open'); toggle.setAttribute('aria-expanded', 'false'); };
-  toggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const open = nav.classList.toggle('open');
-    toggle.setAttribute('aria-expanded', String(open));
-  });
-  $$('#primaryNav .nav-link').forEach(a => a.addEventListener('click', close));
-  document.addEventListener('click', (e) => { if (!e.target.closest('.site-header')) close(); });
-
-  // subtle shadow on header once scrolled
+  // subtle shadow on header once scrolled (nav itself now lives in the left drawer, wired in wireLogin)
   const header = $('#siteHeader');
   const onScroll = () => header.style.boxShadow = window.scrollY > 8 ? '0 6px 24px rgba(0,0,0,.25)' : 'none';
   window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
@@ -835,7 +899,7 @@ function wireModals() {
 
 /* ---------------- login + auth UI ---------------- */
 function wireLogin() {
-  $('#loginBtn').addEventListener('click', () => showModal('#loginModal'));
+  $('#loginBtn').addEventListener('click', () => { closePublicDrawer(); showModal('#loginModal'); });
   $('#forgotLink').addEventListener('click', e => {
     e.preventDefault();
     alert('Please contact your nearest Lucky Lion branch to reset your password.');
@@ -847,7 +911,7 @@ function wireLogin() {
     const err = $('#loginError'); err.classList.add('hidden');
     try {
       const user = await API.login($('#loginUser').value, $('#loginPass').value, $('#loginRemember').checked);
-      if (user.role === 'staff') { window.location.replace('staff.html'); return; }
+      if (user.role === 'staff' || user.role === 'admin') { window.location.replace('staff.html'); return; }   // #10
       hideModal($('#loginModal'));
       $('#loginForm').reset();
       await refreshAuthUI();
@@ -857,50 +921,43 @@ function wireLogin() {
     }
   });
 
-  // guest account dropdown (Login / Create account behind a burger)
-  const guestBtn = $('#guestMenuBtn'), guestDrop = $('#guestDropdown');
-  if (guestBtn && guestDrop) {
-    guestBtn.addEventListener('click', () => {
-      guestDrop.classList.toggle('hidden');
-      guestBtn.setAttribute('aria-expanded', String(!guestDrop.classList.contains('hidden')));
-    });
-    document.addEventListener('click', e => {
-      if (!e.target.closest('.guest-menu')) guestDrop.classList.add('hidden');
-    });
-    // close the menu once an item opens its modal
-    $$('#guestDropdown button').forEach(b => b.addEventListener('click', () => guestDrop.classList.add('hidden')));
-  }
+  // #3: the single left navigation drawer (all nav + account items live inside)
+  const openBtn = $('#navDrawerBtn');
+  openBtn.addEventListener('click', openPublicDrawer);
+  $('#publicScrim').addEventListener('click', closePublicDrawer);
+  $('#publicDrawerClose').addEventListener('click', closePublicDrawer);
 
-  // member dropdown
-  $('#hamburgerBtn').addEventListener('click', () => {
-    const d = $('#memberDropdown');
-    d.classList.toggle('hidden');
-    $('#hamburgerBtn').setAttribute('aria-expanded', String(!d.classList.contains('hidden')));
-  });
-  document.addEventListener('click', e => {
-    if (!e.target.closest('.member-menu')) $('#memberDropdown').classList.add('hidden');
-  });
-  $$('#memberDropdown button[data-panel]').forEach(b =>
-    b.addEventListener('click', () => { $('#memberDropdown').classList.add('hidden'); openPanel(b.dataset.panel); }));
+  // account actions inside the drawer
+  $$('#publicDrawer button[data-panel]').forEach(b =>
+    b.addEventListener('click', () => { closePublicDrawer(); openPanel(b.dataset.panel); }));
   const mdb = $('#memberDashBtn');
-  if (mdb) mdb.addEventListener('click', () => { $('#memberDropdown').classList.add('hidden'); if (location.hash === '#account') syncAccountRoute(); else location.hash = '#account'; });
+  if (mdb) mdb.addEventListener('click', () => { closePublicDrawer(); if (location.hash === '#account') syncAccountRoute(); else location.hash = '#account'; });
   $('#logoutBtn').addEventListener('click', async () => {
-    closeMemberPanel(); await API.logout();
+    closePublicDrawer(); closeMemberPanel(); await API.logout();
     document.body.classList.remove('account-open');           // leave the dashboard immediately
     if (location.hash === '#account') location.hash = '#store';
     await refreshAuthUI();
   });
-  // mobile: the nav links live inside the account dropdown — close it after navigating
-  $$('.drawer-navlink').forEach(a => a.addEventListener('click', () => {
-    const gd = $('#guestDropdown'), md = $('#memberDropdown');
-    if (gd) gd.classList.add('hidden');
-    if (md) md.classList.add('hidden');
+  // nav links close the drawer after navigating; category links also set the Products filter
+  $$('#publicDrawer .drawer-navlink').forEach(a => a.addEventListener('click', () => {
+    if (a.dataset.cat) { PRODUCTS_CAT = a.dataset.cat; if (location.hash === '#products') renderProducts(); }
+    closePublicDrawer();
   }));
-  // the 4/3/2-wheel sublinks open the Products page filtered to that category
-  $$('.drawer-sublink').forEach(a => a.addEventListener('click', () => {
-    PRODUCTS_CAT = a.dataset.cat || 'all';
-    if (location.hash === '#products') renderProducts();
-  }));
+  wireNotifications();   // #16: notification bell
+}
+function openPublicDrawer() {
+  const d = $('#publicDrawer'), s = $('#publicScrim'), b = $('#navDrawerBtn');
+  if (!d) return;
+  d.classList.add('open'); if (s) s.classList.remove('hidden');
+  d.setAttribute('aria-hidden', 'false'); if (b) b.setAttribute('aria-expanded', 'true');
+  document.body.style.overflow = 'hidden';
+}
+function closePublicDrawer() {
+  const d = $('#publicDrawer'), s = $('#publicScrim'), b = $('#navDrawerBtn');
+  if (!d) return;
+  d.classList.remove('open'); if (s) s.classList.add('hidden');
+  d.setAttribute('aria-hidden', 'true'); if (b) b.setAttribute('aria-expanded', 'false');
+  document.body.style.overflow = '';
 }
 
 function wireSignup() {
@@ -909,7 +966,7 @@ function wireSignup() {
   // populate the nearest-branch dropdown from the canonical branch list
   const branchSel = $('#signupBranch');
   if (branchSel) branchSel.innerHTML = `<option value="" selected disabled>— choose the branch nearest you —</option>` + branchOptionsHtml('');
-  $('#signupBtn').addEventListener('click', () => showModal('#signupModal'));
+  $('#signupBtn').addEventListener('click', () => { closePublicDrawer(); showModal('#signupModal'); });
   const toSignup = $('#toSignupLink'); if (toSignup) toSignup.addEventListener('click', e => { e.preventDefault(); openSignup(); });
   const toLogin = $('#toLoginLink'); if (toLogin) toLogin.addEventListener('click', e => { e.preventDefault(); openLogin(); });
   const ssp = $('#signupShowPass');
@@ -921,11 +978,13 @@ function wireSignup() {
     const username = (f.get('username') || '').trim(), password = f.get('password');
     const branch = f.get('branch') || '';
     if (!branch) { err.textContent = 'Please choose the branch nearest you.'; err.classList.remove('hidden'); return; }
+    if (!(await confirmAction('Create your Lucky Lion account with these details?', { title: 'Create account', confirmLabel: 'Create account' }))) return;
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try {
       await API.createUser({
         role: 'customer', branch, name: (f.get('name') || '').trim(), username, password,
-        phone: (f.get('phone') || '').trim(), email: (f.get('email') || '').trim(), address: (f.get('address') || '').trim()
+        phone: (f.get('phone') || '').trim(), email: (f.get('email') || '').trim(), address: (f.get('address') || '').trim(),
+        mustChange: false   // #8: self-signup picks their own password → no forced change
       });
       await API.login(username, password, true);      // sign them straight in
       hideModal($('#signupModal'));
@@ -959,24 +1018,71 @@ async function refreshAuthUI() {
     // browser Back button from a staff view lands on (or flashes through) the public page.
     if (!STAFF_PREVIEW) { window.location.replace('staff.html'); return; }
     showPreviewBar(user);
-    $('#guestMenu').classList.add('hidden');
-    $('#memberMenu').classList.add('hidden');
+    document.body.classList.remove('logged-in');
     return;
   }
   const loggedIn = !!user;
-  $('#guestMenu').classList.toggle('hidden', loggedIn);
-  $('#memberMenu').classList.toggle('hidden', !loggedIn);
-  if (loggedIn) $('#memberName').textContent = `Hi, ${user.name || user.username}`;
+  // #3: one left drawer for everyone; body.logged-in toggles guest vs member items (CSS).
+  document.body.classList.toggle('logged-in', loggedIn);
+  $('#memberName').textContent = loggedIn ? `Hi, ${user.name || user.username}` : 'Lucky Lion';
 
-  // unread-message indicator + light poll while a customer is signed in
+  // #8: a customer on a temporary password must set a new one before using the system.
+  if (loggedIn && user.role === 'customer' && user.mustChangePassword) { await forcePasswordChange(user); }
+
+  // unread-message indicator + schedule notifications + light poll while a customer is signed in
   clearInterval(MEMBER_BADGE_POLL); MEMBER_BADGE_POLL = null;
   clearInterval(MSG_POLL); MSG_POLL = null;   // any prior account's message poll must not survive an auth change
   if (loggedIn && user.role === 'customer') {
     updateMemberBadge();
-    MEMBER_BADGE_POLL = setInterval(updateMemberBadge, 20000);
+    refreshNotifications(user);
+    MEMBER_BADGE_POLL = setInterval(() => { updateMemberBadge(); refreshNotifications(user); }, 20000);
   } else {
     ['#memberMsgBadge', '#memberMsgBadge2'].forEach(s => { const el = $(s); if (el) el.classList.add('hidden'); });
+    const nd = $('#notifDot'); if (nd) nd.classList.add('hidden');
   }
+}
+
+/* ---------- #8: blocking "set a new password" screen (temporary password) ---------- */
+let _forcePwHost = null;
+function forcePasswordChange(user) {
+  return new Promise(resolve => {
+    if (!_forcePwHost) {
+      _forcePwHost = document.createElement('div');
+      _forcePwHost.className = 'modal-backdrop force-pw';   // no `hidden` toggle — stays until done
+      _forcePwHost.innerHTML = `<div class="modal modal-sm" role="dialog" aria-modal="true">
+        <h3 class="modal-title">🔒 Set a new password</h3>
+        <p class="modal-note">Your account uses a temporary password. Please choose a new one to continue.</p>
+        <form class="form" id="forcePwForm">
+          <label>New password <input name="next" type="password" required minlength="4" autocomplete="new-password" /></label>
+          <label>Confirm new password <input name="confirm" type="password" required minlength="4" autocomplete="new-password" /></label>
+          <label class="checkbox chk-show"><input type="checkbox" id="forcePwShow" /> Show password</label>
+          <p class="form-error hidden" id="forcePwErr"></p>
+          <button class="btn btn-primary full" type="submit">Save new password</button>
+        </form></div>`;
+      document.body.appendChild(_forcePwHost);
+    }
+    const host = _forcePwHost;
+    host.style.display = ''; document.body.style.overflow = 'hidden';   // '' → stylesheet's centered grid
+    const form = host.querySelector('#forcePwForm'), err = host.querySelector('#forcePwErr');
+    const show = host.querySelector('#forcePwShow');
+    show.onchange = () => host.querySelectorAll('input[type="password"],input[name="next"],input[name="confirm"]').forEach(i => {
+      if (i.name === 'next' || i.name === 'confirm') i.type = show.checked ? 'text' : 'password';
+    });
+    form.onsubmit = async (e) => {
+      e.preventDefault(); err.classList.add('hidden');
+      const f = new FormData(form);
+      const next = f.get('next'), confirm = f.get('confirm');
+      if (next !== confirm) { err.textContent = 'The passwords do not match.'; err.classList.remove('hidden'); return; }
+      try {
+        await API.setNewPassword(user.id, next);
+        user.mustChangePassword = false;
+        host.style.display = 'none'; document.body.style.overflow = '';
+        form.reset();
+        toast('Password updated — welcome!');
+        resolve(true);
+      } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+    };
+  });
 }
 
 /* ---------------- member panels ---------------- */
@@ -1015,6 +1121,14 @@ async function renderAccountDashboard(user) {
   const scheduled = reps.filter(r => r.status !== 'done' && r.status !== 'cancelled');
   const done = reps.filter(r => r.status === 'done');
   const unread = msgs.filter(m => m.sender === 'staff' && !m.read).length;
+  // #17: where + when the last repair was done
+  const lastDone = done.slice().sort((a, b) => String(b.completedAt || b.date || '').localeCompare(String(a.completedAt || a.date || '')))[0];
+  const lastRepairHtml = (() => {
+    if (!lastDone) return '';
+    const when = lastDone.completedAt ? new Date(lastDone.completedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : niceDay(lastDone.date);
+    const br = lastDone.branch || user.branch;
+    return `<div class="acct-lastrepair">🧾 Last repair: <strong>${esc(when)}</strong>${br ? ' at 📍 ' + nt(branchName(br)) : ''}</div>`;
+  })();
   const tile = (icon, num, label, panel, tone) => `<button class="acct-tile${tone ? ' ' + tone : ''}" data-panel="${panel}"><span class="at-ic">${icon}</span><span class="at-num">${num}</span><span class="at-label">${label}</span></button>`;
   const action = (icon, label, panel) => `<button class="qa" data-panel="${panel}"><span class="qa-icon">${icon}</span>${esc(label)}</button>`;
   host.innerHTML = `
@@ -1022,9 +1136,11 @@ async function renderAccountDashboard(user) {
       <div class="ah-txt">
         <span class="ah-eyebrow">My account</span>
         <strong>Hi, ${esc(user.name || user.username)}</strong>
-        <span>${user.memberId ? esc(user.memberId) : ''}${user.branch ? ' · 📍 ' + nt(branchName(user.branch)) : ''}</span>
+        <span>${user.branch ? '📍 ' + nt(branchName(user.branch)) : ''}</span>
+        ${lastRepairHtml}
       </div>
     </div>
+    ${upcomingReminderHtml(reps)}
     <div class="acct-tiles">
       ${tile('🛵', ebikes.length, 'My e-bikes', 'ebikes')}
       ${tile('🛠️', scheduled.length, 'Scheduled repairs', 'schedule')}
@@ -1126,6 +1242,73 @@ async function updateMemberBadge() {
   if (inline) { inline.textContent = txt; inline.classList.toggle('hidden', n === 0); }
 }
 
+/* ---------- #16: notification bell — new/changed repair schedules ---------- */
+let NOTIF_ITEMS = [];
+const notifKey = (uid) => `ll_notif_seen_${uid}`;
+function wireNotifications() {
+  const bell = $('#notifBell'), panel = $('#notifPanel');
+  if (!bell || !panel) return;
+  bell.addEventListener('click', e => {
+    e.stopPropagation();
+    const show = panel.classList.toggle('hidden') === false;
+    bell.setAttribute('aria-expanded', String(show));
+    if (show) markNotificationsSeen();
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.notif')) panel.classList.add('hidden'); });
+  $('#notifList').addEventListener('click', e => {
+    if (e.target.closest('.notif-item')) { panel.classList.add('hidden'); openPanel('schedule'); }
+  });
+}
+// Diff the customer's current repairs against the last-seen snapshot in localStorage.
+async function refreshNotifications(user) {
+  if (!user || user.role !== 'customer') return;
+  let reps = [];
+  try { reps = await API.getRepairsByUser(user.id); } catch { return; }
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem(notifKey(user.id)) || '{}') || {}; } catch { }
+  const items = [];
+  reps.forEach(r => {
+    const sig = `${r.status}|${r.date}|${r.timeSlot || ''}`;
+    const m = STORE.modelById(r.modelId);
+    const name = m ? m.name : r.modelId;
+    if (!(r.id in seen)) {
+      if (r.status !== 'done' && r.status !== 'cancelled') items.push({ id: r.id, text: `Repair booked for ${name} on ${niceDay(r.date)}.` });
+    } else if (seen[r.id] !== sig) {
+      items.push({ id: r.id, text: `Your ${name} repair was updated — now “${r.status}”${r.date ? ', ' + niceDay(r.date) : ''}.` });
+    }
+  });
+  NOTIF_ITEMS = items;
+  // first run on a device (no snapshot yet) → seed silently, don't shout about every existing repair
+  const firstRun = !localStorage.getItem(notifKey(user.id));
+  if (firstRun) { seedNotifSnapshot(user, reps); NOTIF_ITEMS = []; }
+  paintNotifications();
+}
+function paintNotifications() {
+  const list = $('#notifList'), dot = $('#notifDot');
+  if (!list) return;
+  if (!NOTIF_ITEMS.length) {
+    list.innerHTML = `<p class="notif-empty">You're all caught up.</p>`;
+    if (dot) dot.classList.add('hidden');
+    return;
+  }
+  list.innerHTML = NOTIF_ITEMS.map(i => `<button type="button" class="notif-item">🔔 ${esc(i.text)}</button>`).join('');
+  if (dot) { dot.textContent = NOTIF_ITEMS.length > 9 ? '9+' : String(NOTIF_ITEMS.length); dot.classList.remove('hidden'); }
+}
+function seedNotifSnapshot(user, reps) {
+  const snap = {};
+  reps.forEach(r => { snap[r.id] = `${r.status}|${r.date}|${r.timeSlot || ''}`; });
+  try { localStorage.setItem(notifKey(user.id), JSON.stringify(snap)); } catch { }
+}
+async function markNotificationsSeen() {
+  const user = await API.currentUser();
+  if (!user) return;
+  let reps = [];
+  try { reps = await API.getRepairsByUser(user.id); } catch { }
+  seedNotifSnapshot(user, reps);
+  NOTIF_ITEMS = [];
+  const dot = $('#notifDot'); if (dot) dot.classList.add('hidden');
+}
+
 async function panelEbikes(user) {
   let list = [];
   try { list = await API.getUserEbikes(user.id); } catch { }
@@ -1162,13 +1345,28 @@ function panelPlaceholder(title, msg) {
 function panelMaintenance() {
   const mnt = C.maintenance;
   if (!mnt) return panelPlaceholder('Maintenance', 'General maintenance guides will be posted here.');
+  const catBlock = (cat) => `
+    <div class="tip-cat">
+      <h4>${esc(cat.category)}</h4>
+      <ul>${cat.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+    </div>`;
+  // #19: split into Basic (simple checks when there's a problem) + Detailed (thorough checks & steps).
+  // Falls back to the legacy flat `categories` list if an older content.json is in use.
+  const basic = mnt.basic || [];
+  const detailed = mnt.detailed || [];
+  const legacy = (!basic.length && !detailed.length) ? (mnt.categories || []) : [];
+  const section = (icon, title, sub, cats) => cats.length ? `
+    <div class="mnt-section">
+      <h4 class="mnt-head">${icon} ${esc(title)}</h4>
+      <p class="mnt-sub">${esc(sub)}</p>
+      ${cats.map(catBlock).join('')}
+    </div>` : '';
   return `<h3 class="panel-title">${esc(mnt.heading)}</h3>
     <p class="panel-sub">${esc(mnt.intro)}</p>
-    ${mnt.categories.map(cat => `
-      <div class="tip-cat">
-        <h4>${esc(cat.category)}</h4>
-        <ul>${cat.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
-      </div>`).join('')}`;
+    ${section('📋', 'Basic Maintenance', 'Simple things to check when there’s a problem.', basic)}
+    ${section('🔧', 'Detailed Maintenance', 'Thorough checks and the steps to take.', detailed)}
+    ${legacy.map(catBlock).join('')}
+    ${mnt.source ? `<p class="mnt-source">ℹ️ ${esc(mnt.source)}</p>` : ''}`;
 }
 
 function panelTips() {
@@ -1201,7 +1399,7 @@ async function panelProfile(user) {
   if (!names.length && user.ownedModelId) { const m = STORE.modelById(user.ownedModelId); if (m) names = [m.name]; }
   const unitsText = names.length ? 'Your e-bike(s): <strong>' + esc(names.join(', ')) + '</strong>' : 'No e-bike linked yet.';
   return `<h3 class="panel-title">Profile</h3>
-    <p class="panel-sub">Member ID: <strong>${esc(user.memberId || '—')}</strong> · ${unitsText}</p>
+    <p class="panel-sub">${unitsText}</p>
     <form class="form" id="profileForm">
       <label>Full name <input name="name" value="${esc(user.name)}" /></label>
       <label>Email <input name="email" type="email" value="${esc(user.email)}" /></label>
@@ -1218,12 +1416,13 @@ async function panelProfile(user) {
       <label>New password <input name="next" type="password" required minlength="4" /></label>
       <p class="form-error hidden" id="pwErr"></p>
       <p class="form-ok hidden" id="pwOk">Password updated.</p>
-      <button class="btn btn-login" type="submit">Update password</button>
+      <button class="btn btn-primary full" type="submit">Update password</button>
     </form>`;
 }
 function wireProfile(user) {
   $('#profileForm').addEventListener('submit', async e => {
     e.preventDefault();
+    if (!(await confirmAction('Save these changes to your profile?', { title: 'Save profile', confirmLabel: 'Save changes' }))) return;
     const f = new FormData(e.target);
     await API.updateUser(user.id, { name: f.get('name'), email: f.get('email'), phone: f.get('phone'), address: f.get('address'), branch: f.get('branch') || user.branch });
     $('#profOk').classList.remove('hidden');
@@ -1234,6 +1433,7 @@ function wireProfile(user) {
     e.preventDefault();
     const f = new FormData(e.target); const err = $('#pwErr'), ok = $('#pwOk');
     err.classList.add('hidden'); ok.classList.add('hidden');
+    if (!(await confirmAction('Update your account password?', { title: 'Change password', confirmLabel: 'Update password' }))) return;
     try {
       await API.changePassword(user.id, f.get('current'), f.get('next'));
       ok.classList.remove('hidden'); e.target.reset();
@@ -1266,12 +1466,18 @@ async function panelSchedule(user) {
 
   return `<h3 class="panel-title">Schedule Repair</h3>
     <p class="panel-sub">Book a repair / home visit. (Lunch break 12:00–13:00, closed Sundays vary by branch.)</p>
+    ${upcomingReminderHtml(mine)}
     <div class="msg-cta">Booking a home visit or have a question? <button type="button" class="link-btn" id="msgBranchBtn">💬 Message the branch →</button></div>
     <form class="form" id="repForm">
       <label>E-bike model
-        <select name="modelId">${myModels.map(m => `<option value="${m.id}" translate="no">${esc(m.name)}</option>`).join('')}</select>
+        <select name="modelId" required>${myModels.map(m => `<option value="${m.id}" translate="no">${esc(m.name)}</option>`).join('')}</select>
       </label>
-      <label>Date <input name="date" id="repDate" type="date" required min="${new Date().toISOString().slice(0, 10)}" /></label>
+      <input type="hidden" name="date" id="repDate" required />
+      <div class="cal-field">
+        <span class="cal-label">Pick a date <span class="req" aria-hidden="true">*</span></span>
+        <div class="cal" id="repCalendar"><p class="slot-hint">Loading calendar…</p></div>
+        <p class="cal-legend"><span class="cal-key cal-key-free"></span>Open <span class="cal-key cal-key-full"></span>Fully booked <span class="cal-key cal-key-sel"></span>Selected</p>
+      </div>
       <label>Time slot
         <select name="timeSlot" id="repSlot" required disabled>${slots.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}</select>
       </label>
@@ -1279,9 +1485,73 @@ async function panelSchedule(user) {
       <label>Notes (what needs fixing?) <textarea name="notes" rows="3"></textarea></label>
       <p class="form-ok hidden" id="repOk">Repair booked! Staff will confirm.</p>
       <p class="form-error hidden" id="repErr"></p>
-      <button class="btn btn-primary" type="submit">Book repair</button>
+      <button class="btn btn-primary full" type="submit">Book repair</button>
     </form>
     ${bookings}`;
+}
+
+/* ---------- #15: reminder when a booking is coming up ---------- */
+function upcomingReminderHtml(list) {
+  const today = todayISOlocal();
+  const upcoming = (list || [])
+    .filter(r => r.status !== 'done' && r.status !== 'cancelled' && r.date && r.date >= today)
+    .sort((a, b) => (a.date + (a.timeSlot || '')).localeCompare(b.date + (b.timeSlot || '')));
+  if (!upcoming.length) return '';
+  const r = upcoming[0];
+  const m = STORE.modelById(r.modelId);
+  return `<div class="reminder-banner">🔔 <strong>Reminder:</strong> your ${m ? nt(m.name) : esc(r.modelId)} repair is on
+    <strong>${esc(niceDay(r.date))}</strong>${r.timeSlot ? ' · ' + esc(r.timeSlot) : ''}.</div>`;
+}
+
+/* ---------- #13: month calendar for booking (past greyed, full days blocked) ---------- */
+const isoLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const todayISOlocal = () => isoLocal(new Date());
+function niceDay(iso) {
+  if (!iso) return '';
+  const [y, mo, da] = iso.split('-').map(Number);
+  const d = new Date(y, mo - 1, da);
+  return d.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+let BOOK_CAL_MONTH = null;   // first-of-month Date currently shown
+async function renderBookingCalendar() {
+  const host = $('#repCalendar'); if (!host) return;
+  const month = BOOK_CAL_MONTH;
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const last = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const todayIso = todayISOlocal();
+  const selected = ($('#repDate') || {}).value || '';
+  host.innerHTML = `<p class="slot-hint">Checking availability…</p>`;
+  // which days in this month are fully booked (all slots taken)?
+  let bookedMap = {};
+  try { bookedMap = await API.getBookedSlotsRange(isoLocal(first), isoLocal(last)); } catch { }
+  const monthLabel = first.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+  const canGoBack = first > new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  let cells = '';
+  // leading blanks (week starts Sunday)
+  for (let i = 0; i < first.getDay(); i++) cells += `<span class="cal-day cal-blank"></span>`;
+  for (let day = 1; day <= last.getDate(); day++) {
+    const iso = isoLocal(new Date(month.getFullYear(), month.getMonth(), day));
+    const taken = (bookedMap[iso] || []).filter((s, i, a) => a.indexOf(s) === i);
+    const isPast = iso < todayIso;
+    const isFull = REPAIR_SLOTS.every(s => taken.includes(s));
+    const isSel = iso === selected;
+    const cls = ['cal-day'];
+    let attr = `data-date="${iso}"`;
+    if (isPast) { cls.push('is-past'); attr = ''; }
+    else if (isFull) { cls.push('is-full'); attr = ''; }
+    else cls.push('is-open');
+    if (isSel) cls.push('is-sel');
+    cells += `<button type="button" class="${cls.join(' ')}" ${attr}${(isPast || isFull) ? ' disabled' : ''}>
+      <span class="cal-num">${day}</span>${isFull && !isPast ? '<span class="cal-tag">Full</span>' : ''}</button>`;
+  }
+  host.innerHTML = `
+    <div class="cal-head">
+      <button type="button" class="cal-nav" id="calPrev" ${canGoBack ? '' : 'disabled'} aria-label="Previous month">‹</button>
+      <span class="cal-month">${esc(monthLabel)}</span>
+      <button type="button" class="cal-nav" id="calNext" aria-label="Next month">›</button>
+    </div>
+    <div class="cal-dow">${['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => `<span>${d}</span>`).join('')}</div>
+    <div class="cal-grid">${cells}</div>`;
 }
 function renderMyReps(list) {
   if (!list.length) return `<p class="panel-sub">No bookings yet.</p>`;
@@ -1342,9 +1612,23 @@ function wireSchedule(user) {
   });
   const form = $('#repForm');
   if (!form) return;                 // no owned e-bike → no booking form to wire
-  const dateEl = $('#repDate');
-  dateEl.addEventListener('change', () => paintSlots(dateEl.value));
-  paintSlots(dateEl.value);
+
+  // #13: month calendar. Clicking an open day sets the hidden #repDate + loads its slots.
+  const cal = $('#repCalendar');
+  BOOK_CAL_MONTH = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  renderBookingCalendar();
+  if (cal) cal.addEventListener('click', e => {
+    const prev = e.target.closest('#calPrev'), next = e.target.closest('#calNext'), day = e.target.closest('.cal-day[data-date]');
+    if (prev) { BOOK_CAL_MONTH = new Date(BOOK_CAL_MONTH.getFullYear(), BOOK_CAL_MONTH.getMonth() - 1, 1); renderBookingCalendar(); }
+    else if (next) { BOOK_CAL_MONTH = new Date(BOOK_CAL_MONTH.getFullYear(), BOOK_CAL_MONTH.getMonth() + 1, 1); renderBookingCalendar(); }
+    else if (day) {
+      const iso = day.dataset.date;
+      const hidden = $('#repDate'); if (hidden) hidden.value = iso;
+      cal.querySelectorAll('.cal-day').forEach(c => c.classList.remove('is-sel'));
+      day.classList.add('is-sel');
+      paintSlots(iso);
+    }
+  });
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -1352,7 +1636,9 @@ function wireSchedule(user) {
     const date = f.get('date'), slot = f.get('timeSlot');
     const ok = $('#repOk'), err = $('#repErr');
     ok.classList.add('hidden'); err.classList.add('hidden');
+    if (!date) { err.textContent = 'Please pick a date on the calendar.'; err.classList.remove('hidden'); return; }
     if (!slot) { err.textContent = 'Please pick an open time slot.'; err.classList.remove('hidden'); return; }
+    if (!(await confirmAction(`Book a repair for ${niceDay(date)} (${slot})?`, { title: 'Book repair', confirmLabel: 'Book repair' }))) return;
 
     // re-check right before saving, in case someone booked the same slot meanwhile
     try {
@@ -1365,11 +1651,13 @@ function wireSchedule(user) {
       }
     } catch { /* availability check failed — let the booking through */ }
 
-    await API.createRepair({ userId: user.id, modelId: f.get('modelId'), date, timeSlot: slot, notes: f.get('notes') });
+    await API.createRepair({ userId: user.id, modelId: f.get('modelId'), date, timeSlot: slot, notes: f.get('notes'), branch: user.branch });
     ok.classList.remove('hidden');
     toast('Repair booked! Staff will confirm. 🛠️');
     e.target.reset();
+    const hidden = $('#repDate'); if (hidden) hidden.value = '';
     await paintSlots('');
+    await renderBookingCalendar();   // reflect the new booking (day may now be fuller/full)
     $('#myReps').innerHTML = renderMyReps(await API.getRepairsByUser(user.id));
   });
 }

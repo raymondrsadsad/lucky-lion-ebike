@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css?v=20260929a" />
+  <link rel="stylesheet" href="css/styles.css?v=20261012a" />
   <style>html { scroll-padding-top: 120px; }</style>
 </head>
 <body>
@@ -22,6 +22,13 @@
       </a>
       <div class="nav-right">
         <span id="staffName"></span>
+        <div class="notif" id="staffNotifWrap">
+          <button class="notif-btn" id="notifBell" aria-label="Notifications" aria-expanded="false">🔔<span class="notif-dot hidden" id="notifDot"></span></button>
+          <div class="notif-panel hidden" id="notifPanel">
+            <div class="notif-head">Notifications</div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
         <div class="member-menu" id="staffMenu">
           <button class="avatar-btn" id="staffHamburger" aria-label="Account menu" aria-expanded="false"><span class="avatar avatar-ph" id="staffAvatarBtn">S</span></button>
           <div class="dropdown hidden" id="staffDropdown">
@@ -298,6 +305,16 @@
               <div id="branchMapsEditor"></div>
             </div>
           </details>
+          <details class="acc contacts-details">
+            <summary>
+              <span class="acc-left"><span class="acc-title">🕗 Branch operating hours</span></span>
+              <span class="acc-right"><span class="acc-hint">Edit</span><span class="acc-chev">▾</span></span>
+            </summary>
+            <div class="acc-body">
+              <p class="mp-hint">Set each branch's <strong>operating hours</strong>, shown to customers on the <strong>Location</strong> page.</p>
+              <div id="branchHoursEditor"></div>
+            </div>
+          </details>
           <label>Email <input name="email" type="email" autocomplete="off" /></label>
           <label>Facebook URL <input name="facebook" autocomplete="off" /></label>
           <label>YouTube URL <input name="youtube" autocomplete="off" /></label>
@@ -352,7 +369,7 @@
   <script src="js/themes.js?v=20260827a"></script>
   <script src="js/poster.js?v=20260916g"></script>
   <script src="js/store.js?v=20260827a"></script>
-  <script src="js/api.js?v=20260827a"></script>
-  <script src="js/staff.js?v=20260929a"></script>
+  <script src="js/api.js?v=20261012a"></script>
+  <script src="js/staff.js?v=20261012a"></script>
 </body>
 </html>

@@ -1433,3 +1433,82 @@ body.location-open main > section:not(#location) { display: none; }
 .poster-preview canvas { touch-action: none; }          /* let the photo be dragged on touch without scrolling the page */
 .poster-preview canvas.grab { cursor: grab; }
 .poster-preview canvas.grabbing { cursor: grabbing; }
+
+/* ============================================================
+   PANEL REVISIONS (2026-10) — new UI pieces
+   ============================================================ */
+
+/* #1 required-field red asterisk */
+.req { color: var(--red); margin-left: 2px; font-weight: 700; }
+.form-reqnote { font-size: .8rem; color: var(--muted); margin: 0 0 .4rem; }
+
+/* #3 public left-nav drawer: guest vs member items (hidden until the right auth state) */
+.member-only { display: none; }
+body.logged-in .drawer-group.member-only { display: block; }
+body.logged-in .drawer-link.member-only { display: flex; }
+body.logged-in .notif.member-only { display: block; }
+body.logged-in .guest-only { display: none; }
+/* buttons styled as drawer links keep the list look */
+.drawer-nav button.drawer-link { width: 100%; text-align: left; background: none; font: inherit; cursor: pointer; }
+
+/* #4 consistent primary action buttons */
+.btn-danger { background: var(--red); border-color: var(--red); color: #fff; }
+.btn-danger:hover { filter: brightness(1.05); }
+.form .btn.full, .modal .btn.full { min-height: 46px; font-size: 1rem; }
+
+/* #7 confirmation dialog */
+.confirm-actions { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.1rem; }
+.confirm-actions .btn { min-width: 110px; }
+
+/* #8 forced password change — stays on top, can't be dismissed */
+.modal-backdrop.force-pw { z-index: 120; }
+
+/* #16 notification bell */
+.notif { position: relative; }
+.notif-btn { position: relative; border: 0; background: none; cursor: pointer; font-size: 1.3rem; line-height: 1; padding: .35rem .45rem; border-radius: var(--r-pill); }
+.notif-btn:hover { background: var(--mist); }
+.notif-dot { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 9px; background: var(--red); color: #fff; font-size: .62rem; font-weight: 800; display: grid; place-items: center; }
+.notif-panel { position: absolute; top: calc(100% + 8px); right: 0; width: min(300px, 86vw); background: #fff; border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-lg); z-index: 110; overflow: hidden; }
+.notif-head { padding: .7rem .9rem; font-weight: 700; border-bottom: 1px solid var(--line); background: var(--mist); }
+.notif-list { max-height: 60vh; overflow-y: auto; }
+.notif-item { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: none; font: inherit; font-size: .88rem; padding: .7rem .9rem; cursor: pointer; }
+.notif-item:hover { background: var(--red-soft); }
+.notif-empty { padding: 1rem .9rem; color: var(--muted); font-size: .9rem; margin: 0; }
+
+/* #13 booking calendar */
+.cal-field { margin: .2rem 0 .8rem; }
+.cal-label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .3rem; }
+.cal { border: 1px solid var(--line); border-radius: var(--r); padding: .6rem; background: #fff; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
+.cal-month { font-weight: 700; }
+.cal-nav { border: 1px solid var(--line); background: #fff; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+.cal-nav:disabled { opacity: .35; cursor: not-allowed; }
+.cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+.cal-dow span { text-align: center; font-size: .68rem; font-weight: 700; color: var(--muted); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-day { position: relative; aspect-ratio: 1/1; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; font: inherit; display: grid; place-items: center; padding: 0; }
+.cal-day.cal-blank { border: 0; background: none; cursor: default; }
+.cal-day.is-open:hover { border-color: var(--red); background: var(--red-soft); }
+.cal-day.is-past { color: var(--muted); background: var(--mist); cursor: not-allowed; opacity: .55; }
+.cal-day.is-full { background: var(--red-soft); color: var(--red); cursor: not-allowed; border-color: #f3c6c6; }
+.cal-day.is-sel { background: var(--red); color: #fff; border-color: var(--red); font-weight: 800; }
+.cal-num { font-size: .9rem; font-weight: 600; }
+.cal-tag { position: absolute; bottom: 2px; font-size: .52rem; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.cal-legend { font-size: .72rem; color: var(--muted); margin: .5rem 0 0; display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.cal-key { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1px solid var(--line); }
+.cal-key-free { background: #fff; } .cal-key-full { background: var(--red-soft); border-color: #f3c6c6; } .cal-key-sel { background: var(--red); border-color: var(--red); }
+
+/* #15 upcoming-repair reminder */
+.reminder-banner { background: linear-gradient(90deg, var(--red-soft), #fff); border: 1px solid #f3c6c6; border-left: 4px solid var(--red); border-radius: var(--r-sm, 8px); padding: .7rem .9rem; margin: .4rem 0 1rem; font-size: .9rem; }
+
+/* #17 last repair line on the customer dashboard */
+.acct-lastrepair { margin-top: .3rem; font-size: .85rem; opacity: .95; }
+
+/* #12 new-repair toolbar */
+.rep-toolbar { margin: .2rem 0 .8rem; }
+
+/* #18/#19 maintenance Basic/Detailed sections */
+.mnt-section { margin-top: 1rem; }
+.mnt-head { margin: 0 0 .1rem; font-size: 1.02rem; }
+.mnt-sub { margin: 0 0 .5rem; color: var(--muted); font-size: .85rem; }
+.mnt-source { margin-top: 1.2rem; padding-top: .7rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .82rem; font-style: italic; }

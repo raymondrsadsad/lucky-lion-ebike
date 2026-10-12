@@ -34,7 +34,7 @@ const API = (() => {
   const toApp = (r) => r && ({
     id: r.id, memberId: r.member_id, role: r.role, username: r.username, password: r.password,
     name: r.name, email: r.email, phone: r.phone, address: r.address, ownedModelId: r.owned_model_id,
-    avatarUrl: r.avatar_url, branch: r.branch
+    avatarUrl: r.avatar_url, branch: r.branch, mustChangePassword: !!r.must_change_password
   });
   const userToRow = (u) => ({
     id: u.id, member_id: u.memberId, role: u.role, username: u.username, password: u.password,
@@ -44,7 +44,7 @@ const API = (() => {
   const repToApp = (r) => r && ({
     id: r.id, userId: r.user_id, modelId: r.model_id, date: r.date,
     timeSlot: r.time_slot, status: r.status, notes: r.notes,
-    repairType: r.repair_type, cost: r.cost, completedAt: r.completed_at
+    repairType: r.repair_type, cost: r.cost, completedAt: r.completed_at, branch: r.branch
   });
   const msgToApp = (r) => r && ({ id: r.id, userId: r.user_id, sender: r.sender, body: r.body, read: r.read, createdAt: r.created_at });
 
@@ -102,7 +102,15 @@ const API = (() => {
         name: data.name || '', email: data.email || '', phone: data.phone || '',
         address: data.address || '', ownedModelId: data.ownedModelId || null
       });
-      const created = await req(`/users`, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+      // #8: a staff/admin-created account gets a TEMPORARY password → force a change on first login.
+      // Public self-signup passes mustChange:false (the person chose their own password).
+      row.must_change_password = data.mustChange != null ? !!data.mustChange : true;
+      let created;
+      try { created = await req(`/users`, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) }); }
+      catch (e) {   // column may not exist yet (panel-revisions.sql not run) → create without it
+        delete row.must_change_password;
+        created = await req(`/users`, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+      }
       return toApp(created[0]);
     },
     async updateUser(id, patch) {
@@ -114,8 +122,20 @@ const API = (() => {
       if ('ownedModelId' in patch) row.owned_model_id = patch.ownedModelId;
       if ('avatarUrl' in patch) row.avatar_url = patch.avatarUrl;
       if ('branch' in patch) row.branch = patch.branch;
+      if ('mustChangePassword' in patch) row.must_change_password = !!patch.mustChangePassword;
       const updated = await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
       return toApp(updated[0]);
+    },
+    // #8: set a brand-new password during the forced-change flow (no current needed — the active
+    // session already proves identity). Clears the must-change flag.
+    async setNewPassword(id, next) {
+      await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ password: next, must_change_password: false }) });
+      return true;
+    },
+    // #8: staff/admin reset a customer's password to a temporary one → forces a change on next login.
+    async resetPassword(id, tempPass) {
+      await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ password: tempPass, must_change_password: true }) });
+      return true;
     },
     // Upload a staff avatar image to the shared 'store-photos' bucket; returns the public URL.
     async uploadAvatar(blob) {
@@ -177,7 +197,9 @@ const API = (() => {
       const rows = await req(`/users?id=eq.${encodeURIComponent(id)}&select=password`);
       if (!rows || !rows.length) throw new Error('User not found.');
       if (rows[0].password !== current) throw new Error('Current password is incorrect.');
-      await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ password: next }) });
+      // #8: changing the password also clears the "must change" flag (retry without it if the column is absent).
+      try { await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ password: next, must_change_password: false }) }); }
+      catch (e) { await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ password: next }) }); }
       return true;
     },
 
@@ -188,11 +210,29 @@ const API = (() => {
     async getBookedSlots(date) {
       if (!date) return [];
       const rows = await req(`/repairs?date=eq.${encodeURIComponent(date)}&select=id,time_slot,status`) || [];
-      return rows.filter(r => r.status !== 'done').map(r => ({ id: r.id, slot: r.time_slot }));
+      // a repair frees its slot once it's done OR cancelled
+      return rows.filter(r => r.status !== 'done' && r.status !== 'cancelled').map(r => ({ id: r.id, slot: r.time_slot }));
+    },
+    // #13: booked slots for a whole date RANGE at once (one query), for the month calendar.
+    // Returns { 'YYYY-MM-DD': ['08:00–10:00', ...] } of slots that still hold a booking.
+    async getBookedSlotsRange(startDate, endDate) {
+      if (!startDate || !endDate) return {};
+      const rows = await req(`/repairs?date=gte.${encodeURIComponent(startDate)}&date=lte.${encodeURIComponent(endDate)}&select=date,time_slot,status`) || [];
+      const map = {};
+      rows.filter(r => r.status !== 'done' && r.status !== 'cancelled').forEach(r => { (map[r.date] ??= []).push(r.time_slot); });
+      return map;
     },
     async createRepair(data) {
       const row = { id: uid(), user_id: data.userId, model_id: data.modelId, date: data.date, time_slot: data.timeSlot, status: 'pending', notes: data.notes || '' };
-      const created = await req(`/repairs`, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+      // #12: staff/admin create-on-behalf can set a service type + the branch the repair belongs to.
+      if (data.repairType) row.repair_type = data.repairType;
+      if (data.branch) row.branch = data.branch;
+      let created;
+      try { created = await req(`/repairs`, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) }); }
+      catch (e) {   // repairs.branch may not exist yet (panel-revisions.sql not run) → create without it
+        delete row.branch;
+        created = await req(`/repairs`, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+      }
       return repToApp(created[0]);
     },
     async updateRepairStatus(id, status) {

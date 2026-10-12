@@ -139,7 +139,29 @@
   "maintenance": {
     "heading": "General Maintenance",
     "intro": "Simple, regular care keeps any Lucky Lion e-bike, e-trike, or e-car safe and long-lasting. These general guidelines apply to all units.",
-    "categories": [
+    "source": "Maintenance information provided by the Lucky Lion main shop.",
+    "basic": [
+      {
+        "category": "Routine Safety Checks (before riding)",
+        "items": [
+          "Brakes firm, tires inflated, and lights / horn / signals working.",
+          "Mirrors and seat secure; bolts tight.",
+          "Battery charged and locked securely in place.",
+          "Wear a helmet appropriate to your unit's class (see Road Rules)."
+        ]
+      },
+      {
+        "category": "Common Issues & Quick Fixes",
+        "items": [
+          "Won't turn on: check the battery charge, main switch, and battery connector.",
+          "Reduced range: check tire pressure, avoid overloading; the battery may need servicing.",
+          "Brakes rubbing or weak: they need adjustment — visit the branch.",
+          "Charger light behaving oddly: let the battery cool, reseat the charger; if it persists, have it checked.",
+          "For anything electrical or persistent, contact Lucky Lion Trece — units include lifetime service."
+        ]
+      }
+    ],
+    "detailed": [
       {
         "category": "Battery & Charging",
         "items": [
@@ -176,25 +198,6 @@
           "Dry the unit thoroughly after cleaning or riding in the rain.",
           "Store in a covered, dry place away from direct sun and rain.",
           "For long storage, keep the battery around half-to-full charge and top it up monthly."
-        ]
-      },
-      {
-        "category": "Routine Safety Checks (before riding)",
-        "items": [
-          "Brakes firm, tires inflated, and lights / horn / signals working.",
-          "Mirrors and seat secure; bolts tight.",
-          "Battery charged and locked securely in place.",
-          "Wear a helmet appropriate to your unit's class (see Road Rules)."
-        ]
-      },
-      {
-        "category": "Common Issues & Quick Fixes",
-        "items": [
-          "Won't turn on: check the battery charge, main switch, and battery connector.",
-          "Reduced range: check tire pressure, avoid overloading; the battery may need servicing.",
-          "Brakes rubbing or weak: they need adjustment — visit the branch.",
-          "Charger light behaving oddly: let the battery cool, reseat the charger; if it persists, have it checked.",
-          "For anything electrical or persistent, contact Lucky Lion Trece — units include lifetime service."
         ]
       }
     ]

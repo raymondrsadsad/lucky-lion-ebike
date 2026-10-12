@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css?v=20260929a" />
+  <link rel="stylesheet" href="css/styles.css?v=20261012a" />
 </head>
 <body>
   <div id="themeDecor" aria-hidden="true"></div>
@@ -21,95 +21,72 @@
   <!-- ============ HEADER ============ -->
   <header class="site-header" id="siteHeader">
     <div class="header-inner">
-      <!-- mobile nav toggle (hidden on desktop) -->
-      <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
+      <!-- left: menu button opens the navigation sidebar (all nav + account live inside) -->
+      <button class="hamburger drawer-btn" id="navDrawerBtn" aria-label="Open menu" aria-controls="publicDrawer" aria-expanded="false">
         <span></span><span></span><span></span>
+        <span class="menu-badge hidden" id="memberMsgBadge" aria-hidden="true"></span>
       </button>
 
-      <!-- brand (left) -->
+      <!-- brand -->
       <a href="#top" class="brand" aria-label="Lucky Lion home">
         <span class="logo-wrap"><img class="brand-mark" src="assets/logo.jpg" alt="Lucky Lion logo" /></span>
         <span class="brand-text" translate="no">LUCKY&nbsp;LION</span>
       </a>
 
-      <!-- primary nav -->
-      <nav class="nav-left" id="primaryNav" aria-label="Primary">
-        <div class="nav-item has-sub" id="storeNavItem">
-          <a href="#store" class="nav-link">Products <span class="nav-caret" aria-hidden="true">▾</span></a>
-          <div class="nav-sub" id="storeSubmenu"><!-- categories filled by app.js --></div>
-        </div>
-        <a href="#about" class="nav-link">About</a>
-        <a href="#location" class="nav-link">Location</a>
-      </nav>
-
-      <!-- top-right socials + login / member menu -->
+      <!-- top-right: socials + (member) notification bell -->
       <div class="nav-right">
         <div class="socials" id="hdrSocials"></div>
-        <!-- guest account menu (Login / Create account tucked behind a burger) -->
-        <div class="guest-menu" id="guestMenu">
-          <button class="hamburger" id="guestMenuBtn" aria-label="Account menu" aria-expanded="false">
-            <span></span><span></span><span></span>
-          </button>
-          <div class="dropdown hidden" id="guestDropdown">
-            <div class="dropdown-nav menu-sec">
-              <div class="menu-sec-h">Browse</div>
-              <div class="menu-grid">
-                <a class="drawer-navlink mtile" href="#store"><span class="mi">🛒</span>Products</a>
-                <a class="drawer-navlink mtile" data-cat="4-wheels" href="#products"><span class="mi">🚗</span>4 Wheels</a>
-                <a class="drawer-navlink mtile" data-cat="3-wheels" href="#products"><span class="mi">🛺</span>3 Wheels</a>
-                <a class="drawer-navlink mtile" data-cat="2-wheels" href="#products"><span class="mi">🏍️</span>2 Wheels</a>
-                <a class="drawer-navlink mtile" href="#about"><span class="mi">ℹ️</span>About</a>
-                <a class="drawer-navlink mtile" href="#location"><span class="mi">📍</span>Location</a>
-              </div>
-            </div>
-            <div class="menu-sec acct-sec">
-              <div class="menu-sec-h">Account</div>
-              <div class="menu-grid">
-                <button class="mtile" id="loginBtn"><span class="mi">🔑</span>Login</button>
-                <button class="mtile" id="signupBtn"><span class="mi">✨</span>Sign up</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- shown after a customer logs in -->
-        <div class="member-menu hidden" id="memberMenu">
-          <button class="hamburger" id="hamburgerBtn" aria-label="Member menu" aria-expanded="false">
-            <span></span><span></span><span></span>
-          </button>
-          <span class="menu-badge hidden" id="memberMsgBadge" aria-hidden="true"></span>
-          <div class="dropdown hidden" id="memberDropdown">
-            <div class="dropdown-nav menu-sec">
-              <div class="menu-sec-h">Browse</div>
-              <div class="menu-grid">
-                <a class="drawer-navlink mtile" href="#store"><span class="mi">🛒</span>Products</a>
-                <a class="drawer-navlink mtile" data-cat="4-wheels" href="#products"><span class="mi">🚗</span>4 Wheels</a>
-                <a class="drawer-navlink mtile" data-cat="3-wheels" href="#products"><span class="mi">🛺</span>3 Wheels</a>
-                <a class="drawer-navlink mtile" data-cat="2-wheels" href="#products"><span class="mi">🏍️</span>2 Wheels</a>
-                <a class="drawer-navlink mtile" href="#about"><span class="mi">ℹ️</span>About</a>
-                <a class="drawer-navlink mtile" href="#location"><span class="mi">📍</span>Location</a>
-              </div>
-            </div>
-            <div class="dropdown-head" id="memberName">Member</div>
-            <div class="menu-sec acct-sec">
-              <div class="menu-sec-h">My account</div>
-              <div class="menu-grid">
-                <button class="mtile" id="memberDashBtn"><span class="mi">🏠</span>Dashboard</button>
-                <button class="mtile" data-panel="profile"><span class="mi">🪪</span>Profile</button>
-                <button class="mtile" data-panel="ebikes"><span class="mi">🛵</span>My E-Bikes</button>
-                <button class="mtile" data-panel="messages"><span class="mi">💬</span>Messages <span class="menu-badge inline hidden" id="memberMsgBadge2"></span></button>
-                <button class="mtile" data-panel="maintenance"><span class="mi">🔧</span>Maintenance</button>
-                <button class="mtile" data-panel="tips"><span class="mi">💡</span>Tips</button>
-                <button class="mtile" data-panel="roadrules"><span class="mi">🛑</span>Road Rules</button>
-                <button class="mtile" data-panel="schedule"><span class="mi">🗓️</span>Schedule Repair</button>
-              </div>
-            </div>
-            <button class="mtile mtile-wide danger" id="logoutBtn"><span class="mi">⏻</span>Log out</button>
+        <div class="notif member-only" id="notifWrap">
+          <button class="notif-btn" id="notifBell" aria-label="Notifications" aria-expanded="false">🔔<span class="notif-dot hidden" id="notifDot"></span></button>
+          <div class="notif-panel hidden" id="notifPanel">
+            <div class="notif-head">Notifications</div>
+            <div class="notif-list" id="notifList"></div>
           </div>
         </div>
       </div>
     </div>
   </header>
+
+  <!-- ============ LEFT NAVIGATION SIDEBAR (all navigation lives here) ============ -->
+  <div class="drawer-scrim hidden" id="publicScrim"></div>
+  <aside class="drawer" id="publicDrawer" aria-label="Site menu" aria-hidden="true">
+    <div class="drawer-top">
+      <div class="drawer-user">
+        <span class="logo-wrap"><img class="brand-mark" src="assets/logo.jpg" alt="" /></span>
+        <div class="drawer-user-txt">
+          <strong id="memberName">Lucky Lion</strong>
+          <span id="drawerTagline">Quality Ride, Trusted Performance.</span>
+        </div>
+      </div>
+      <button class="drawer-close" id="publicDrawerClose" aria-label="Close menu">Close</button>
+    </div>
+    <nav class="drawer-nav" aria-label="Site sections">
+      <div class="drawer-group">Browse</div>
+      <a class="drawer-link drawer-navlink" href="#store"><span class="di">🛒</span>Products</a>
+      <a class="drawer-link drawer-navlink" data-cat="4-wheels" href="#products"><span class="di">🚗</span>4 Wheels</a>
+      <a class="drawer-link drawer-navlink" data-cat="3-wheels" href="#products"><span class="di">🛺</span>3 Wheels</a>
+      <a class="drawer-link drawer-navlink" data-cat="2-wheels" href="#products"><span class="di">🏍️</span>2 Wheels</a>
+      <a class="drawer-link drawer-navlink" href="#about"><span class="di">ℹ️</span>About</a>
+      <a class="drawer-link drawer-navlink" href="#location"><span class="di">📍</span>Location</a>
+
+      <!-- shown when logged OUT -->
+      <div class="drawer-group guest-only">Account</div>
+      <button class="drawer-link guest-only" id="loginBtn"><span class="di">🔑</span>Login</button>
+      <button class="drawer-link guest-only" id="signupBtn"><span class="di">✨</span>Create account</button>
+
+      <!-- shown when logged IN -->
+      <div class="drawer-group member-only">My account</div>
+      <button class="drawer-link member-only" id="memberDashBtn"><span class="di">🏠</span>Dashboard</button>
+      <button class="drawer-link member-only" data-panel="profile"><span class="di">🪪</span>Profile</button>
+      <button class="drawer-link member-only" data-panel="ebikes"><span class="di">🛵</span>My E-Bikes</button>
+      <button class="drawer-link member-only" data-panel="messages"><span class="di">💬</span>Messages<span class="di-badge hidden" id="memberMsgBadge2"></span></button>
+      <button class="drawer-link member-only" data-panel="maintenance"><span class="di">🔧</span>Maintenance</button>
+      <button class="drawer-link member-only" data-panel="tips"><span class="di">💡</span>Tips</button>
+      <button class="drawer-link member-only" data-panel="roadrules"><span class="di">🛑</span>Road Rules</button>
+      <button class="drawer-link member-only" data-panel="schedule"><span class="di">🗓️</span>Schedule Repair</button>
+      <button class="drawer-link member-only danger" id="logoutBtn"><span class="di">⏻</span>Log out</button>
+    </nav>
+  </aside>
 
   <main id="top">
     <!-- ============ HERO ============ -->
@@ -281,7 +258,7 @@
   <script src="js/branches.js?v=20260917g"></script>
   <script src="js/themes.js?v=20260827a"></script>
   <script src="js/store.js?v=20260827a"></script>
-  <script src="js/api.js?v=20260827a"></script>
-  <script src="js/app.js?v=20260929a"></script>
+  <script src="js/api.js?v=20261012a"></script>
+  <script src="js/app.js?v=20261012a"></script>
 </body>
 </html>

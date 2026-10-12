@@ -6,6 +6,60 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<':
 // nt(): escape + wrap a proper noun (branch / model / brand name) so Google Translate won't mangle it
 const nt = (s) => `<span translate="no">${esc(s)}</span>`;
 
+/* ---------- #1: red asterisk on required fields (observer-driven) ---------- */
+function markRequired(root = document) {
+  root.querySelectorAll('label').forEach(label => {
+    const ctrl = label.querySelector(':scope > input[required], :scope > select[required], :scope > textarea[required]');
+    if (!ctrl || label.querySelector(':scope > .req-line')) return;
+    const first = label.firstChild;
+    if (!first || first.nodeType !== 3 || !first.textContent.trim()) return;
+    const line = document.createElement('span');
+    line.className = 'req-line';
+    label.insertBefore(line, first);
+    line.appendChild(first);
+    const star = document.createElement('span');
+    star.className = 'req'; star.textContent = ' *'; star.setAttribute('aria-hidden', 'true'); star.title = 'required';
+    line.appendChild(star);
+  });
+}
+let _reqObsTimer = null;
+function startRequiredObserver() {
+  markRequired();
+  const obs = new MutationObserver(() => { clearTimeout(_reqObsTimer); _reqObsTimer = setTimeout(() => markRequired(), 80); });
+  obs.observe(document.body, { childList: true, subtree: true });
+}
+
+/* ---------- #7: styled confirmation dialog (replaces native confirm) ---------- */
+let _confirmHost = null;
+function confirmAction(message, opts = {}) {
+  const { title = 'Please confirm', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = opts;
+  return new Promise(resolve => {
+    if (!_confirmHost) {
+      _confirmHost = document.createElement('div');
+      _confirmHost.className = 'modal-backdrop hidden confirm-backdrop';
+      _confirmHost.innerHTML = `<div class="modal modal-sm" role="dialog" aria-modal="true">
+        <h3 class="modal-title" id="confirmTitle"></h3>
+        <p class="modal-note" id="confirmMsg"></p>
+        <div class="confirm-actions">
+          <button type="button" class="btn btn-ghost" id="confirmNo"></button>
+          <button type="button" class="btn btn-primary" id="confirmYes"></button>
+        </div></div>`;
+      document.body.appendChild(_confirmHost);
+    }
+    const host = _confirmHost;
+    host.querySelector('#confirmTitle').textContent = title;
+    host.querySelector('#confirmMsg').textContent = message;
+    const yes = host.querySelector('#confirmYes'), no = host.querySelector('#confirmNo');
+    yes.textContent = confirmLabel; no.textContent = cancelLabel;
+    yes.classList.toggle('btn-danger', !!danger);
+    host.classList.remove('hidden'); document.body.style.overflow = 'hidden';
+    const done = (val) => { host.classList.add('hidden'); document.body.style.overflow = ''; yes.onclick = no.onclick = host.onclick = null; resolve(val); };
+    yes.onclick = () => done(true);
+    no.onclick = () => done(false);
+    host.onclick = (e) => { if (e.target === host) done(false); };
+  });
+}
+
 // ---- fixed e-bike colour palette (single source of truth; A→Z, capitalized) ----
 // Owner can tweak any swatch hex here; the same 13 choices back the poster, the Models
 // colour editor, and the per-unit colour label. "Other…" keeps a free-text/custom escape.
@@ -117,6 +171,8 @@ async function init() {
   // guard: staff or admin only
   const me = await API.currentUser();
   if (!me || (me.role !== 'staff' && me.role !== 'admin')) { window.location.replace('index.html'); return; }
+  // #8: a temporary-password account must set a new password before using the portal.
+  if (me.mustChangePassword) { await forceStaffPasswordChange(me); return; }
   ME = me;
   // staff oversight views default to their own branch; admin defaults to "all"
   VIEW_BRANCH = isAdmin() ? null : myBranch();
@@ -137,11 +193,12 @@ async function init() {
     const addE = e.target.closest('.add-ebike');
     const editBtn = e.target.closest('.unit-edit-btn');
     if (delU) {
-      if (!confirm(`Delete "${delU.dataset.name}"? This removes the account and their repair records.`)) return;
+      if (!(await confirmAction(`Delete "${delU.dataset.name}"? This removes the account and their repair records.`, { title: 'Delete account', confirmLabel: 'Delete', danger: true }))) return;
       delU.disabled = true;
       try { await API.deleteUser(delU.dataset.id); await renderUsers(); }
       catch (ex) { alert('Delete failed: ' + ex.message); delU.disabled = false; }
     } else if (delE) {
+      if (!(await confirmAction('Remove this e-bike from the customer?', { title: 'Remove unit', confirmLabel: 'Remove', danger: true }))) return;
       delE.disabled = true;
       const det = delE.closest('details[data-user]');
       try { await API.removeUserEbike(delE.dataset.id); if (det) await refreshUnits(det.dataset.user); }
@@ -153,6 +210,7 @@ async function init() {
       const cust = CUSTOMERS.find(c => c.id === addE.dataset.user);
       detail.branch = (cust && cust.branch) || myBranch();
       const modelId = box.querySelector('.unit-model').value;
+      if (!(await confirmAction('Add this e-bike to the customer?', { title: 'Add unit', confirmLabel: 'Add unit' }))) return;
       addE.disabled = true;
       try {
         await API.addUserEbike(addE.dataset.user, modelId, detail);
@@ -183,6 +241,7 @@ async function init() {
     const form = e.target.closest('.unit-edit-form');
     if (!form) return;
     e.preventDefault();
+    if (!(await confirmAction('Save changes to this unit?', { title: 'Save unit', confirmLabel: 'Save changes' }))) return;
     const detail = readUnitDetail(form);
     const det = form.closest('details[data-user]');
     try {
@@ -213,8 +272,36 @@ async function init() {
 
   renderDashboard();
   updateInboxBadgeCount();
-  setInterval(updateInboxBadgeCount, 20000);   // keep the inbox unread badge fresh
+  wireStaffNotifications();          // #16: notification bell
+  refreshStaffNotifications();
+  setInterval(() => { updateInboxBadgeCount(); refreshStaffNotifications(); }, 20000);   // keep badges fresh
   showView(viewFromHash(), false);
+  startRequiredObserver();   // #1: red * on required fields
+}
+
+/* ---------- #8: blocking "set a new password" screen for staff/admin ---------- */
+function forceStaffPasswordChange(me) {
+  const host = document.createElement('div');
+  host.className = 'modal-backdrop force-pw';
+  host.innerHTML = `<div class="modal modal-sm" role="dialog" aria-modal="true">
+    <h3 class="modal-title">🔒 Set a new password</h3>
+    <p class="modal-note">Your account uses a temporary password. Please choose a new one to continue.</p>
+    <form class="form" id="forcePwForm">
+      <label>New password <input name="next" type="password" required minlength="4" autocomplete="new-password" /></label>
+      <label>Confirm new password <input name="confirm" type="password" required minlength="4" autocomplete="new-password" /></label>
+      <p class="form-error hidden" id="forcePwErr"></p>
+      <button class="btn btn-primary full" type="submit">Save new password</button>
+    </form></div>`;
+  document.body.appendChild(host);
+  document.body.style.overflow = 'hidden';
+  const err = host.querySelector('#forcePwErr');
+  host.querySelector('#forcePwForm').addEventListener('submit', async e => {
+    e.preventDefault(); err.classList.add('hidden');
+    const f = new FormData(e.target);
+    if (f.get('next') !== f.get('confirm')) { err.textContent = 'The passwords do not match.'; err.classList.remove('hidden'); return; }
+    try { await API.setNewPassword(me.id, f.get('next')); location.reload(); }
+    catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+  });
 }
 
 /* ================= SIDE DRAWER + VIEW ROUTER =================
@@ -1333,7 +1420,7 @@ function wireModelVariants(root = '#modelsList') {
     } catch (ex) { alert('Save failed: ' + ex.message); }
   }));
   $$(`${root} .var-del`).forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('Delete this colour and its photos?')) return;
+    if (!(await confirmAction('Delete this colour and its photos?', { title: 'Delete colour', confirmLabel: 'Delete', danger: true }))) return;
     try { await API.deleteVariant(b.dataset.id); await refreshModel(b.dataset.model); toast('Colour deleted.'); }
     catch (ex) { alert('Delete failed: ' + ex.message); }
   }));
@@ -1341,7 +1428,7 @@ function wireModelVariants(root = '#modelsList') {
     MP_TARGET = b.dataset.model; MP_VARIANT = b.dataset.vid; $('#modelPhotoInput').click();
   }));
   $$(`${root} .vp-del`).forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('Delete this photo?')) return;
+    if (!(await confirmAction('Delete this photo?', { title: 'Delete photo', confirmLabel: 'Delete', danger: true }))) return;
     b.disabled = true;
     try { await API.deleteModelPhoto(b.dataset.id, b.dataset.path); await refreshModel(b.dataset.model); }
     catch (ex) { alert('Delete failed: ' + ex.message); b.disabled = false; }
@@ -1372,7 +1459,7 @@ function wireModelPhotos(root = '#modelsList') {
     $('#modelPhotoInput').click();
   }));
   $$(`${root} .mp-del`).forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('Delete this photo?')) return;
+    if (!(await confirmAction('Delete this photo?', { title: 'Delete photo', confirmLabel: 'Delete', danger: true }))) return;
     const id = modelOf(b); b.disabled = true;
     try { await API.deleteModelPhoto(b.dataset.id, b.dataset.path); await refreshModel(id); }
     catch (e) { alert('Delete failed: ' + e.message); b.disabled = false; }
@@ -1484,7 +1571,7 @@ function wireModelForms(root = '#modelsList') {
   });
   // base model → soft-delete via the hidden flag (removed from store + list, restorable below)
   $$(`${root} .remove-model`).forEach(b => b.addEventListener('click', async () => {
-    if (!confirm(`Delete "${b.dataset.name || 'this model'}"? It's removed from the store. You can restore it from "Deleted models".`)) return;
+    if (!(await confirmAction(`Delete "${b.dataset.name || 'this model'}"? It's removed from the store. You can restore it from "Deleted models".`, { title: 'Delete model', confirmLabel: 'Delete', danger: true }))) return;
     try { await API.upsertModelMeta(b.dataset.id, { hidden: true }); await renderModels(); }
     catch (ex) { alert('Failed: ' + ex.message); }
   }));
@@ -1495,7 +1582,7 @@ function wireModelForms(root = '#modelsList') {
   }));
   // custom model → permanent delete (its meta row is the only place it exists)
   $$(`${root} .del-model`).forEach(b => b.addEventListener('click', async () => {
-    if (!confirm(`Permanently delete "${b.dataset.name || 'this model'}"? This can't be undone.`)) return;
+    if (!(await confirmAction(`Permanently delete "${b.dataset.name || 'this model'}"? This can't be undone.`, { title: 'Delete permanently', confirmLabel: 'Delete', danger: true }))) return;
     try { await API.deleteModelMeta(b.dataset.id); await renderModels(); }
     catch (ex) { alert('Failed: ' + ex.message); }
   }));
@@ -1680,6 +1767,64 @@ async function updateInboxBadgeCount() {
   INBOX_UNREAD = n;
   updateInboxBadge(n);
   paintDashInbox();
+}
+
+/* ---------- #16: staff/admin notification bell — new/changed repair schedules ---------- */
+let STAFF_NOTIF = [];
+const staffNotifKey = () => `ll_staff_notif_${(ME && ME.id) || 'x'}`;
+function wireStaffNotifications() {
+  const bell = $('#notifBell'), panel = $('#notifPanel');
+  if (!bell || !panel) return;
+  bell.addEventListener('click', e => {
+    e.stopPropagation();
+    const show = panel.classList.toggle('hidden') === false;
+    bell.setAttribute('aria-expanded', String(show));
+    if (show) markStaffNotifSeen();
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.notif')) panel.classList.add('hidden'); });
+  $('#notifList').addEventListener('click', e => { if (e.target.closest('.notif-item')) { panel.classList.add('hidden'); showView('repairs'); } });
+}
+async function refreshStaffNotifications() {
+  let reps = [], users = {};
+  try { reps = await API.getRepairs(); } catch { return; }
+  try { (await API.getUsers()).forEach(u => users[u.id] = u); } catch { }
+  const inScope = r => isAdmin() || ((r.branch || (users[r.userId] || {}).branch) === myBranch());
+  reps = reps.filter(inScope);
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem(staffNotifKey()) || '{}') || {}; } catch { }
+  const nameOf = id => { const u = users[id]; return u ? (u.name || u.username) : 'A customer'; };
+  const items = [];
+  reps.forEach(r => {
+    const sig = `${r.status}|${r.date}|${r.timeSlot || ''}`;
+    if (!(r.id in seen)) {
+      if (r.status !== 'done' && r.status !== 'cancelled') items.push({ text: `New booking from ${nameOf(r.userId)} on ${r.date || '—'}.` });
+    } else if (seen[r.id] !== sig) {
+      items.push({ text: `${nameOf(r.userId)}'s repair changed — now “${r.status}”.` });
+    }
+  });
+  STAFF_NOTIF = items;
+  const firstRun = !localStorage.getItem(staffNotifKey());
+  if (firstRun) { seedStaffNotif(reps); STAFF_NOTIF = []; }
+  paintStaffNotif();
+}
+function paintStaffNotif() {
+  const list = $('#notifList'), dot = $('#notifDot');
+  if (!list) return;
+  if (!STAFF_NOTIF.length) { list.innerHTML = `<p class="notif-empty">You're all caught up.</p>`; if (dot) dot.classList.add('hidden'); return; }
+  list.innerHTML = STAFF_NOTIF.map(i => `<button type="button" class="notif-item">🔔 ${esc(i.text)}</button>`).join('');
+  if (dot) { dot.textContent = STAFF_NOTIF.length > 9 ? '9+' : String(STAFF_NOTIF.length); dot.classList.remove('hidden'); }
+}
+function seedStaffNotif(reps) {
+  const snap = {}; reps.forEach(r => { snap[r.id] = `${r.status}|${r.date}|${r.timeSlot || ''}`; });
+  try { localStorage.setItem(staffNotifKey(), JSON.stringify(snap)); } catch { }
+}
+async function markStaffNotifSeen() {
+  let reps = [], users = {};
+  try { reps = await API.getRepairs(); } catch { }
+  try { (await API.getUsers()).forEach(u => users[u.id] = u); } catch { }
+  const inScope = r => isAdmin() || ((r.branch || (users[r.userId] || {}).branch) === myBranch());
+  seedStaffNotif(reps.filter(inScope));
+  STAFF_NOTIF = []; const dot = $('#notifDot'); if (dot) dot.classList.add('hidden');
 }
 // two-pane inbox: thread list on the left, the open conversation on the right
 let INBOX_THREADS = [], INBOX_BRANCH = null;
@@ -1881,6 +2026,22 @@ function gatherBranchMaps() {
   });
   return out;
 }
+// #11: operating hours per branch (shown to customers on the Location page)
+const branchHoursMap = () => { try { return JSON.parse(SETTINGS.branch_hours || '{}') || {}; } catch { return {}; } };
+function renderBranchHoursEditor() {
+  const host = $('#branchHoursEditor'); if (!host) return;
+  const m = branchHoursMap();
+  host.innerHTML = BRANCHES.map(b => {
+    const val = (m[b.key] != null && m[b.key] !== '') ? m[b.key] : (branchInfo(b.key).hours || '');
+    return `<label class="bp-row">${esc(b.name)}${b.key === HOME_BRANCH_KEY ? ' <span class="cc-star" title="Main branch">★ main</span>' : ''}
+      <input class="bh-input" name="branchHours" data-key="${esc(b.key)}" value="${esc(val)}" placeholder="e.g. Open daily 8:30 AM – 5:30 PM" /></label>`;
+  }).join('');
+}
+function gatherBranchHours() {
+  const out = {};
+  $$('#branchHoursEditor .bh-input').forEach(i => { const v = i.value.trim(); if (v) out[i.dataset.key] = v; });
+  return out;
+}
 function ccNumRow(n) {
   return `<div class="cc-num-row"><input class="cc-num" name="contactNum" aria-label="Contact number" value="${esc(n || '')}" placeholder="e.g. 0997-955-8909" /><button type="button" class="cc-del-num" title="Remove number">×</button></div>`;
 }
@@ -1940,6 +2101,7 @@ async function renderSettings() {
   });
   renderBranchPhonesEditor();
   renderBranchMapsEditor();
+  renderBranchHoursEditor();
   // theme dropdown
   const sel = $('#themeSelect');
   if (sel && typeof THEME_ORDER !== 'undefined') {
@@ -1952,10 +2114,12 @@ function wireSettings() {
     e.preventDefault();
     const ok = $('#settingsOk'), err = $('#settingsErr');
     ok.classList.add('hidden'); err.classList.add('hidden');
+    if (!(await confirmAction('Save these site settings? Changes go live for everyone.', { title: 'Save settings', confirmLabel: 'Save settings' }))) return;
     const f = new FormData(e.target);
     const patch = {}; SETTING_KEYS.forEach(k => patch[k] = (f.get(k) || '').trim());
     patch.branch_phones = JSON.stringify(gatherBranchPhones());
     patch.branch_maps = JSON.stringify(gatherBranchMaps());
+    patch.branch_hours = JSON.stringify(gatherBranchHours());
     patch.active_theme = ($('#themeSelect') && $('#themeSelect').value) || 'default';
     try { await API.updateSettings(patch); SETTINGS = { ...SETTINGS, ...patch }; ok.classList.remove('hidden'); toast('Settings saved — live for everyone.'); }
     catch (ex) { err.textContent = ex.message + ' (Is the site_settings table set up?)'; err.classList.remove('hidden'); }
@@ -1968,7 +2132,7 @@ function fillModelOptions() {
 }
 
 /* ---- users (module scope for in-place refresh) ---- */
-let CUSTOMERS = [], STAFFS = [], EBIKES_BY_USER = {}, CUST_QUERY = '';
+let CUSTOMERS = [], STAFFS = [], EBIKES_BY_USER = {}, CUST_QUERY = '', REPAIRS_BY_USER = {};
 const unitName = (id) => { const m = STORE.modelById(id); return m ? m.name : id; };
 
 // one owned unit — shows its colour + serial numbers, with an inline Edit form
@@ -2014,6 +2178,16 @@ function unitRow(e, canEdit = true) {
   </div>`;
 }
 
+// #17: where + when this customer's last repair was done
+function lastRepairLine(u) {
+  const mine = (REPAIRS_BY_USER[u.id] || []).filter(r => r.status === 'done');
+  if (!mine.length) return `<div class="b-meta" style="color:var(--muted)">🧾 No completed repairs yet.</div>`;
+  const last = mine.slice().sort((a, b) => String(b.completedAt || b.date || '').localeCompare(String(a.completedAt || a.date || '')))[0];
+  const when = last.completedAt ? new Date(last.completedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : (last.date || '—');
+  const br = last.branch || u.branch;
+  return `<div class="b-meta">🧾 Last repair: <strong>${esc(when)}</strong>${br ? ' at ' + nt(branchName(br)) : ''}</div>`;
+}
+
 function custRow(u, canEdit = true) {
   const units = EBIKES_BY_USER[u.id] || [];
   const models = STORE.products.models;
@@ -2027,6 +2201,7 @@ function custRow(u, canEdit = true) {
     <div class="acc-body">
       <div class="b-meta">@${esc(u.username)} · ${esc(u.phone || 'no phone')} · ${esc(u.email || 'no email')}</div>
       <div class="b-meta">${esc(u.address || '—')}</div>
+      ${lastRepairLine(u)}
       <div class="units-block">
         <div class="b-meta" style="margin-bottom:.35rem"><strong>Units (${units.length})</strong></div>
         ${units.map(e => unitRow(e, canEdit)).join('') || '<div class="b-meta" style="color:var(--muted)">No units yet.</div>'}
@@ -2085,6 +2260,8 @@ async function renderUsers() {
   STAFFS = users.filter(u => u.role === 'staff');
   EBIKES_BY_USER = {};
   try { (await API.getAllUserEbikes()).forEach(e => (EBIKES_BY_USER[e.user_id] ??= []).push(e)); } catch { }
+  REPAIRS_BY_USER = {};
+  try { (await API.getRepairs()).forEach(r => (REPAIRS_BY_USER[r.userId] ??= []).push(r)); } catch { }   // #17
   if (!USERS_BRANCH) USERS_BRANCH = myBranch() || BRANCHES[0].key;
 
   // branch picker — staff's own branch is preselected (and shown first via the ordering)
@@ -2137,9 +2314,10 @@ function paintRepairs() {
   const scheduled = inScope.filter(r => r.status !== 'done' && r.status !== 'cancelled').length;
   const done = inScope.filter(r => r.status === 'done' || r.status === 'cancelled').length;
   const branchBar = isAdmin()
-    ? `<div class="branch-bar"><label>Branch <select id="repBranchSel">${branchOptionsHtml(REP_BRANCH === 'all' ? '' : REP_BRANCH, { all: true, allLabel: 'All branches' })}</select></label><span class="ro-tag">👁 Admin — view only</span></div>`
+    ? `<div class="branch-bar"><label>Branch <select id="repBranchSel">${branchOptionsHtml(REP_BRANCH === 'all' ? '' : REP_BRANCH, { all: true, allLabel: 'All branches' })}</select></label><span class="ro-tag">👁 Admin — all branches</span></div>`
     : `<div class="branch-bar"><span class="b-meta">Showing <strong>${nt(branchName(myBranch()))}</strong> repairs.</span></div>`;
   $('#repairsList').innerHTML = branchBar + `
+    <div class="rep-toolbar"><button type="button" class="btn btn-primary" id="repNewBtn">➕ New repair</button></div>
     <div class="seg" role="tablist">
       <button class="seg-btn ${REP_TAB === 'scheduled' ? 'is-active' : ''}" data-tab="scheduled" role="tab">Scheduled <span class="seg-count">${scheduled}</span></button>
       <button class="seg-btn ${REP_TAB === 'done' ? 'is-active' : ''}" data-tab="done" role="tab">History <span class="seg-count">${done}</span></button>
@@ -2154,6 +2332,7 @@ function paintRepairs() {
     <div id="repRows"></div>`;
   const bs = $('#repBranchSel');
   if (bs) bs.addEventListener('change', e => { REP_BRANCH = e.target.value || 'all'; paintRepairs(); });
+  const nb = $('#repNewBtn'); if (nb) nb.addEventListener('click', openNewRepair);
   $$('#repairsList .seg-btn').forEach(b => b.addEventListener('click', () => { REP_TAB = b.dataset.tab; paintRepairs(); }));
   const s = $('#repSearch');
   if (s) s.addEventListener('input', e => { REP_QUERY = e.target.value; paintRepairRows(); });
@@ -2202,7 +2381,7 @@ function repBranchTag(r) {
 }
 
 function scheduledRow(r) {
-  const canEdit = !isAdmin();
+  const canEdit = true;   // #10: admin can manage repairs too (full remote control)
   const m = STORE.modelById(r.modelId);
   const overdue = r.date && r.date < today10();
   const next = r.status === 'pending' ? 'in-progress' : 'done';
@@ -2225,7 +2404,7 @@ function scheduledRow(r) {
 }
 
 function doneRow(r) {
-  const canEdit = !isAdmin();
+  const canEdit = true;   // #10: admin can manage repairs too (full remote control)
   const cancelled = r.status === 'cancelled';
   const m = STORE.modelById(r.modelId);
   const u = REP_USERS[r.userId];
@@ -2276,30 +2455,95 @@ function paintRepairRows() {
 function wireRepairRows() {
   const byId = id => REPAIRS.find(r => r.id === id);
   $$('#repRows .rep-next').forEach(b => b.addEventListener('click', async () => {
+    if (!(await confirmAction(`Mark this repair as “${b.dataset.next}”?`, { title: 'Update status', confirmLabel: `Mark ${b.dataset.next}` }))) return;
     b.disabled = true;
     try { await API.updateRepairStatus(b.dataset.id, b.dataset.next); await renderRepairs(); }
     catch (e) { alert('Failed: ' + e.message); b.disabled = false; }
   }));
   $$('#repRows .rep-reopen').forEach(b => b.addEventListener('click', async () => {
+    if (!(await confirmAction('Re-open this repair? It moves back to Scheduled.', { title: 'Re-open repair', confirmLabel: 'Re-open' }))) return;
     b.disabled = true;
     try { await API.updateRepairStatus(b.dataset.id, 'pending'); await renderRepairs(); }
     catch (e) { alert('Failed: ' + e.message); b.disabled = false; }
   }));
   // Cancel = keep the record (status 'cancelled') so it still counts in reports.
   $$('#repRows .rep-cancel').forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('Cancel this repair? It stays in the history as cancelled.')) return;
+    if (!(await confirmAction('Cancel this repair? It stays in the history as cancelled.', { title: 'Cancel repair', confirmLabel: 'Cancel repair', danger: true }))) return;
     b.disabled = true;
     try { await API.updateRepairStatus(b.dataset.id, 'cancelled'); await renderRepairs(); }
     catch (e) { alert('Failed: ' + e.message); b.disabled = false; }
   }));
   $$('#repRows .rep-del').forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('Delete this repair record? This cannot be undone.')) return;
+    if (!(await confirmAction('Delete this repair record? This cannot be undone.', { title: 'Delete repair', confirmLabel: 'Delete', danger: true }))) return;
     b.disabled = true;
     try { await API.deleteRepair(b.dataset.id); await renderRepairs(); }
     catch (e) { alert('Delete failed: ' + e.message); b.disabled = false; }
   }));
   $$('#repRows .rep-edit').forEach(b => b.addEventListener('click', () => { const r = byId(b.dataset.id); if (r) openRepairEditor(r); }));
   $$('#repRows .rep-msg').forEach(b => b.addEventListener('click', () => { INBOX_OPEN = b.dataset.user; showView('inbox'); }));
+}
+
+/* ---------- #12: staff/admin create a repair on behalf of a customer ---------- */
+function openNewRepair() {
+  // customers in scope (staff: own branch; admin: whichever branch is selected, or all)
+  const inScope = (c) => isAdmin() ? (REP_BRANCH === 'all' || !REP_BRANCH || c.branch === REP_BRANCH) : (c.branch === myBranch());
+  const custs = CUSTOMERS.filter(inScope).sort((a, b) => (a.name || a.username || '').localeCompare(b.name || b.username || ''));
+  const custOpts = custs.map(c => `<option value="${esc(c.id)}">${esc(c.name || c.username)}${c.branch ? ' — ' + esc(branchShort(c.branch)) : ''}</option>`).join('');
+  $('#panelBody').innerHTML = `
+    <h3 class="panel-title">➕ New repair</h3>
+    <p class="panel-sub">Book a repair for a customer. Only e-bikes they own can be selected.</p>
+    <form class="form" id="newRepForm">
+      <label>Customer <select name="userId" id="nrCustomer" required><option value="" disabled selected>— choose a customer —</option>${custOpts}</select></label>
+      <label>E-bike <select name="modelId" id="nrModel" required disabled><option value="">— pick a customer first —</option></select></label>
+      <label>Service type <select name="repairType"><option value="">— not set —</option>${REPAIR_TYPES.map(t => `<option>${esc(t)}</option>`).join('')}</select></label>
+      <label>Date <input name="date" id="nrDate" type="date" required min="${today10()}" /></label>
+      <label>Time slot <select name="timeSlot" id="nrSlot" required disabled><option value="">— pick a date —</option></select></label>
+      <p class="slot-hint" id="nrSlotHint"></p>
+      <label>Notes <textarea name="notes" rows="3"></textarea></label>
+      <p class="form-error hidden" id="nrErr"></p>
+      <button class="btn btn-primary full" type="submit">Create repair</button>
+    </form>`;
+  $('#panelModal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  const REP_SLOTS = ['08:00–10:00', '10:00–12:00', '13:00–15:00', '15:00–17:00'];
+  const custSel = $('#nrCustomer'), modelSel = $('#nrModel'), dateEl = $('#nrDate'), slotSel = $('#nrSlot'), slotHint = $('#nrSlotHint');
+  custSel.addEventListener('change', () => {
+    const units = EBIKES_BY_USER[custSel.value] || [];
+    const seen = new Set();
+    const opts = units.filter(e => !seen.has(e.model_id) && seen.add(e.model_id)).map(e => {
+      const m = STORE.modelById(e.model_id); return `<option value="${esc(e.model_id)}">${esc(m ? m.name : e.model_id)}</option>`;
+    }).join('');
+    modelSel.innerHTML = opts || '<option value="">— this customer has no e-bike on file —</option>';
+    modelSel.disabled = !opts;
+  });
+  const paintNrSlots = async () => {
+    const date = dateEl.value;
+    slotSel.disabled = true;
+    if (!date) { slotSel.innerHTML = '<option value="">— pick a date —</option>'; slotHint.textContent = ''; return; }
+    slotHint.textContent = 'Checking availability…';
+    let taken = [];
+    try { taken = (await API.getBookedSlots(date)).map(b => b.slot); } catch { }
+    const free = REP_SLOTS.filter(s => !taken.includes(s));
+    slotSel.innerHTML = REP_SLOTS.map(s => `<option value="${esc(s)}"${taken.includes(s) ? ' disabled' : ''}>${esc(s)}${taken.includes(s) ? ' — TAKEN' : ''}</option>`).join('');
+    slotSel.value = free[0] || ''; slotSel.disabled = !free.length;
+    slotHint.textContent = free.length ? `${free.length} of ${REP_SLOTS.length} slots open.` : 'All slots are booked on this date.';
+  };
+  dateEl.addEventListener('change', paintNrSlots);
+  $('#newRepForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const err = $('#nrErr'); err.classList.add('hidden');
+    const f = new FormData(e.target);
+    const userId = f.get('userId'), modelId = f.get('modelId'), date = f.get('date'), slot = f.get('timeSlot');
+    if (!userId || !modelId) { err.textContent = 'Please choose a customer and one of their e-bikes.'; err.classList.remove('hidden'); return; }
+    if (!date || !slot) { err.textContent = 'Please pick a date and an open time slot.'; err.classList.remove('hidden'); return; }
+    if (!(await confirmAction(`Create this repair for ${repNameOf(userId)}?`, { title: 'Create repair', confirmLabel: 'Create repair' }))) return;
+    const cust = REP_USERS[userId];
+    try {
+      await API.createRepair({ userId, modelId, date, timeSlot: slot, repairType: f.get('repairType') || null, notes: f.get('notes') || '', branch: cust ? cust.branch : null });
+      $('#panelModal').classList.add('hidden'); document.body.style.overflow = '';
+      toast('Repair created.');
+      await renderRepairs();
+    } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+  });
 }
 
 function openRepairEditor(r) {
@@ -2317,7 +2561,7 @@ function openRepairEditor(r) {
           ${REPAIR_TYPES.map(t => `<option ${r.repairType === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}
         </select>
       </label>
-      <label>Date <input name="date" type="date" value="${esc(r.date || '')}" /></label>
+      <label>Date <input name="date" type="date" value="${esc(r.date || '')}" min="${today10()}" /></label>
       <label>Time slot <input name="timeSlot" value="${esc(r.timeSlot || '')}" placeholder="e.g. 10:00–12:00" /></label>
       <label>Charge (₱) <input name="cost" type="number" min="0" step="1" value="${r.cost != null ? esc(r.cost) : ''}" /></label>
       <label>Notes <textarea name="notes" rows="3">${esc(r.notes || '')}</textarea></label>
@@ -2329,6 +2573,7 @@ function openRepairEditor(r) {
     e.preventDefault();
     const f = new FormData(e.target), err = $('#repEditErr');
     err.classList.add('hidden');
+    if (!(await confirmAction('Save changes to this repair?', { title: 'Save repair', confirmLabel: 'Save changes' }))) return;
     const num = v => { v = (v || '').toString().trim(); return v === '' ? null : Number(v); };
     try {
       await API.updateRepair(r.id, {
@@ -2390,6 +2635,7 @@ function wireCreate() {
     const isCust = role === 'customer';
     const branch = role === 'admin' ? null : (!isAdmin() ? myBranch() : (f.get('branch') || ''));
     if (role !== 'admin' && !branch) { err.textContent = 'Please choose a branch.'; err.classList.remove('hidden'); return; }
+    if (!(await confirmAction(`Create this ${role} account?`, { title: 'Create account', confirmLabel: 'Create account' }))) return;
     const modelId = isCust ? (f.get('ownedModelId') || null) : null;
     try {
       const u = await API.createUser({
@@ -2446,7 +2692,7 @@ async function renderStorePhotos() {
       </div>`).join('');
     const ids = uploaded.map(p => p.id);
     $$('#photoList .del').forEach(b => b.addEventListener('click', async () => {
-      if (!confirm('Delete this photo?')) return;
+      if (!(await confirmAction('Delete this photo?', { title: 'Delete photo', confirmLabel: 'Delete', danger: true }))) return;
       b.disabled = true;
       const id = b.closest('.photo-item').dataset.id;
       try { await API.deleteStorePhoto(id, b.dataset.path); await renderStorePhotos(); }
