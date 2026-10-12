@@ -1,0 +1,15 @@
+{
+  "_note": "Default/built-in store photos bundled with the site. Staff-uploaded photos (Supabase) are shown in addition to these.",
+  "photos": [
+    "assets/store/store-01.jpg",
+    "assets/store/store-02.jpg",
+    "assets/store/store-03.jpg",
+    "assets/store/store-04.jpg",
+    "assets/store/store-05.jpg",
+    "assets/store/store-06.jpg",
+    "assets/store/store-07.jpg",
+    "assets/store/store-08.jpg",
+    "assets/store/store-09.jpg",
+    "assets/store/store-10.jpg"
+  ]
+}

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lucky Lion eBike — Staff</title>
+  <meta name="theme-color" content="#141414" />
+  <link rel="icon" href="assets/logo.jpg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css?v=20260929a" />
+  <style>html { scroll-padding-top: 120px; }</style>
+</head>
+<body>
+  <header class="site-header staff-header">
+    <div class="staff-bar">
+      <button class="hamburger drawer-btn" id="drawerBtn" aria-label="Menu" aria-expanded="false" aria-controls="staffDrawer"><span></span><span></span><span></span></button>
+      <a href="staff.html" class="brand">
+        <img class="brand-mark" src="assets/logo.jpg" alt="Lucky Lion eBike" />
+        <span class="brand-text" translate="no">LUCKY&nbsp;LION<small>Staff</small></span>
+      </a>
+      <div class="nav-right">
+        <span id="staffName"></span>
+        <div class="member-menu" id="staffMenu">
+          <button class="avatar-btn" id="staffHamburger" aria-label="Account menu" aria-expanded="false"><span class="avatar avatar-ph" id="staffAvatarBtn">S</span></button>
+          <div class="dropdown hidden" id="staffDropdown">
+            <div class="dropdown-head" id="staffMenuName">Staff</div>
+            <button id="staffProfileBtn">Profile</button>
+            <button class="danger" id="logoutBtn">Log out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- side drawer -->
+  <div class="drawer-scrim hidden" id="drawerScrim"></div>
+  <aside class="drawer" id="staffDrawer" aria-label="Staff menu" aria-hidden="true">
+    <div class="drawer-top">
+      <div class="drawer-user">
+        <span class="avatar avatar-ph avatar-lg" id="drawerAvatar">S</span>
+        <div class="drawer-user-txt">
+          <strong id="drawerName">Staff</strong>
+          <span id="drawerRole">Staff account</span>
+        </div>
+      </div>
+      <button class="drawer-close" id="drawerClose" aria-label="Close menu">Close</button>
+    </div>
+    <nav class="drawer-nav" id="drawerNav" aria-label="Staff sections">
+      <div class="drawer-group">Overview</div>
+      <a class="drawer-link" href="#dashboard" data-view="dashboard"><span class="di">📊</span>Dashboard</a>
+      <a class="drawer-link" href="#analytics" data-view="analytics"><span class="di">📈</span>Analytics</a>
+
+      <div class="drawer-group">Customers</div>
+      <a class="drawer-link" href="#users" data-view="users"><span class="di">👥</span>Users &amp; E-Bikes</a>
+      <a class="drawer-link" href="#create" data-view="create"><span class="di">➕</span>Create User</a>
+      <a class="drawer-link" href="#repairs" data-view="repairs"><span class="di">🛠️</span>Scheduled Repairs<span class="di-badge hidden" id="navRepairCount"></span></a>
+      <a class="drawer-link" href="#inbox" data-view="inbox"><span class="di">💬</span>Inbox<span class="di-badge hidden" id="navInboxCount"></span></a>
+      <a class="drawer-link" href="#registry" data-view="registry"><span class="di">📇</span>E-Bike Registry</a>
+
+      <div class="drawer-group">Store</div>
+      <a class="drawer-link" href="#models" data-view="models"><span class="di">🛵</span>Models</a>
+      <a class="drawer-link" href="#photos" data-view="photos"><span class="di">🖼️</span>Store Photos</a>
+
+      <div class="drawer-group">Marketing</div>
+      <a class="drawer-link" href="#poster" data-view="poster"><span class="di">🎨</span>Poster Maker</a>
+
+      <div class="drawer-group">System</div>
+      <a class="drawer-link" href="#settings" data-view="settings"><span class="di">⚙️</span>Site Settings</a>
+      <a class="drawer-link" id="drawerViewSite" href="index.html?preview=1" target="_blank" rel="noopener"><span class="di">🌐</span>View public site<span class="di-ext">↗</span></a>
+    </nav>
+  </aside>
+
+  <main>
+    <section class="section view" id="dashboard">
+      <h2 class="section-title">Dashboard</h2>
+      <p class="section-lead" id="dashHello">Everything that needs your attention today.</p>
+      <div id="dashBody"></div>
+    </section>
+
+    <section class="section view" id="analytics">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title">📈 Analytics</h2>
+      <div id="analyticsBody"></div>
+    </section>
+
+    <section class="section view" id="users">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title">Users &amp; Their E-Bikes</h2>
+      <div id="usersList"></div>
+    </section>
+
+    <section class="section view section-alt" id="repairs">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title">Scheduled Repairs</h2>
+      <div id="repairsList"></div>
+    </section>
+
+    <section class="section view" id="inbox">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title">Inbox</h2>
+      <p class="section-lead">Messages from customers. Tap a conversation to reply.</p>
+      <div id="inboxList"></div>
+    </section>
+
+    <section class="section view" id="registry">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title">E-Bike Registry</h2>
+      <p class="section-lead">Every e-bike owned across all customers. Search by chassis number, filter by wheels, and see who owns each unit and when it was acquired.</p>
+      <div id="registryList"></div>
+    </section>
+
+    <section class="section view" id="create">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title" id="createTitle">Create User</h2>
+      <p class="section-lead" id="createLead">Create an account for a new customer.</p>
+      <div style="max-width:520px;margin:0 auto">
+        <form class="form" id="createForm">
+          <label id="createRoleWrap">Role
+            <select name="role"><option value="customer">Customer</option></select>
+          </label>
+          <label id="createBranchWrap">Branch
+            <select name="branch" id="createBranch"></select>
+          </label>
+          <label>Full name <input name="name" autocomplete="name" required /></label>
+          <label>Username <input name="username" autocomplete="username" required /></label>
+          <label>Temporary password <input name="password" autocomplete="new-password" required minlength="4" /></label>
+          <label>Phone <input name="phone" autocomplete="tel" /></label>
+          <label>Email <input name="email" type="email" autocomplete="email" /></label>
+          <label>Address <input name="address" autocomplete="street-address" /></label>
+          <label>E-bike purchased (customers)
+            <select name="ownedModelId" id="ownedSelect"><option value="">— none —</option></select>
+          </label>
+          <div id="createUnitDetails" class="unit-details hidden">
+            <div class="grid2">
+              <label>Colour <select name="variantId" id="createVariant"><option value="">— colour —</option></select></label>
+              <div class="cf-labeled">Colour label <span id="createColorField"></span></div>
+            </div>
+            <div class="grid3">
+              <label>Chassis no. <input name="chassisNo" /></label>
+              <label>Battery no. <input name="batteryNo" /></label>
+              <label>Motor no. <input name="motorNo" /></label>
+            </div>
+            <label>Acquired <input name="acquiredAt" type="date" /></label>
+            <label>Sale note (staff only) <input name="saleNote" placeholder="e.g. discount, 6-month Home Credit" /></label>
+          </div>
+          <p class="form-error hidden" id="createErr"></p>
+          <p class="form-ok hidden" id="createOk"></p>
+          <button class="btn btn-primary" type="submit">Create account</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="section view" id="models">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title">Models</h2>
+      <p class="section-lead">Edit each model's specs and price, set its main photo and colour photos, reorder or hide it from the store, or add a new model. Changes go live for everyone.</p>
+      <details class="acc" style="max-width:640px;margin:0 auto 1.4rem">
+        <summary>
+          <span class="acc-left"><span class="acc-title">➕ Add a new model</span></span>
+          <span class="acc-right"><span class="acc-hint">Open</span><span class="acc-chev">▾</span></span>
+        </summary>
+        <div class="acc-body">
+          <form class="form" id="addModelForm">
+            <label>Name <input name="name" autocomplete="off" required /></label>
+            <label>Type
+              <select name="wheels"><option value="4-wheels">4 Wheels</option><option value="3-wheels">3 Wheels</option><option value="2-wheels">2 Wheels</option></select>
+            </label>
+            <label>Motor (Watts) <input name="motor_w" type="number" /></label>
+            <label>Battery <input name="battery" placeholder="e.g. 60V/20AH Lead Acid" /></label>
+            <label>Brakes <input name="brakes" placeholder="e.g. Front Disc / Rear Drum" /></label>
+            <label>Price (SRP) <input name="srp" type="number" /></label>
+            <div class="mp-block">
+              <div class="mp-head"><strong>Main photo</strong>
+                <button type="button" class="btn btn-ghost btn-sm" id="newModelAddPhoto">+ Set main photo</button>
+              </div>
+              <p class="mp-hint">The main photo shown when a customer first opens the unit. Uploads when you add the model; add colour-specific photos afterwards under 🎨 Colours.</p>
+              <div class="photo-grid mp-grid" id="newModelPhotos"></div>
+            </div>
+            <p class="form-error hidden" id="addModelErr"></p>
+            <p class="form-ok hidden" id="addModelOk">Model added.</p>
+            <button class="btn btn-primary" type="submit">Add model</button>
+          </form>
+        </div>
+      </details>
+      <div id="modelsList"></div>
+      <input type="file" id="modelPhotoInput" accept="image/*" hidden aria-label="Upload model photo" />
+    </section>
+
+    <section class="section view" id="poster">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title">Poster Maker</h2>
+      <p class="section-lead">Every field below is pre-filled but fully editable — tweak anything, then Generate and download a ready-to-post poster (PNG).</p>
+      <div class="poster-tool">
+        <form class="form" id="posterForm">
+          <div class="form-group-title">Template &amp; model</div>
+          <label>Template <select name="templateKey" id="posterTemplate"></select></label>
+          <label>Fill from model <select id="posterModel"></select></label>
+
+          <div class="form-group-title">On the poster</div>
+          <label>Model name <input name="name" autocomplete="off" /></label>
+          <div class="grid2">
+            <label>Battery <input name="battery" placeholder="e.g. 60V 32Ah" /></label>
+            <label>Motor power <input name="motorW" placeholder="e.g. 1000W" /></label>
+          </div>
+          <div class="grid2">
+            <label>Load capacity <input name="loadKg" placeholder="e.g. 150 KG" /></label>
+            <label>Brake <input name="brake" placeholder="e.g. Front &amp; Rear Disc" /></label>
+          </div>
+          <label>Max speed <input name="maxSpeed" placeholder="e.g. 45 KM/H" /></label>
+
+          <div class="form-group-title">Price</div>
+          <label>Sale price (₱) <input name="salePrice" placeholder="e.g. 49,000" /></label>
+
+          <div class="form-group-title">Contact</div>
+          <label>Contact number <input name="phone" autocomplete="off" placeholder="09XX XXX XXXX" /></label>
+          <label>Add a saved number <select id="posterPhonePick"></select></label>
+
+          <div class="form-group-title">Available colours <span class="fg-note">up to 5 — type a colour name (e.g. red) or #hex</span></div>
+          <div id="posterColors" class="poster-colors"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="posterAddColor">+ Add colour</button>
+
+          <div class="form-group-title">Features <span class="fg-note">up to 6</span></div>
+          <div class="grid2" id="posterFeatures">
+            <label>Feature 1 <input name="f1" /></label>
+            <label>Feature 2 <input name="f2" /></label>
+            <label>Feature 3 <input name="f3" /></label>
+            <label>Feature 4 <input name="f4" /></label>
+            <label>Feature 5 <input name="f5" /></label>
+            <label>Feature 6 <input name="f6" /></label>
+          </div>
+
+          <div class="form-group-title">E-bike photo <span class="fg-note">transparent PNG — drag it on the preview to place, slider to size</span></div>
+          <div class="poster-photo-controls">
+            <button type="button" class="btn btn-ghost btn-sm" id="posterPhotoBtn">📷 Upload photo</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="posterPhotoClear" disabled>Remove</button>
+          </div>
+          <label class="poster-size-row">Size <input type="range" id="posterPhotoSize" min="10" max="300" value="100" disabled /></label>
+          <input type="file" id="posterPhotoInput" accept="image/png,image/*" hidden aria-label="Upload poster photo" />
+
+          <div class="row-actions">
+            <button class="btn btn-primary" type="button" id="posterDownload" disabled>Download PNG</button>
+          </div>
+        </form>
+        <div class="poster-preview"><canvas id="posterCanvas" width="1024" height="1535"></canvas></div>
+      </div>
+      <datalist id="cssColorNames">
+        <option value="black"></option><option value="white"></option><option value="gray"></option>
+        <option value="silver"></option><option value="red"></option><option value="darkred"></option>
+        <option value="maroon"></option><option value="orange"></option><option value="gold"></option>
+        <option value="yellow"></option><option value="green"></option><option value="darkgreen"></option>
+        <option value="lime"></option><option value="teal"></option><option value="blue"></option>
+        <option value="navy"></option><option value="royalblue"></option><option value="skyblue"></option>
+        <option value="purple"></option><option value="violet"></option><option value="pink"></option>
+        <option value="brown"></option><option value="beige"></option>
+      </datalist>
+    </section>
+
+    <section class="section view section-alt" id="photos">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title">Store Photos</h2>
+      <p class="section-lead">These appear in the slideshow on the main page. Upload a photo, crop it to fit, and it goes live for everyone.</p>
+      <div style="text-align:center;margin-bottom:1.4rem">
+        <label class="btn btn-primary" for="photoInput">+ Upload photo</label>
+        <input type="file" id="photoInput" accept="image/*" hidden aria-label="Upload store photo" />
+        <p class="form-error hidden" id="photoErr" style="margin-top:.6rem"></p>
+      </div>
+      <div id="photoList" class="photo-grid"></div>
+    </section>
+
+    <section class="section view" id="settings">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title">Site Settings</h2>
+      <p class="section-lead">Edit each branch's contact number and the social links shown across the site. Changes go live for everyone.</p>
+      <div style="max-width:560px;margin:0 auto">
+        <form class="form" id="settingsForm">
+          <label>Website theme (seasonal / sale)
+            <select name="active_theme" id="themeSelect"></select>
+          </label>
+          <details class="acc contacts-details">
+            <summary>
+              <span class="acc-left"><span class="acc-title">📞 Branch contact numbers</span></span>
+              <span class="acc-right"><span class="acc-hint">Edit</span><span class="acc-chev">▾</span></span>
+            </summary>
+            <div class="acc-body">
+              <p class="mp-hint">Set the phone number shown for each branch on the <strong>Location</strong> page. The <strong>main branch</strong>'s number is used as the site's default.</p>
+              <div id="branchPhonesEditor"></div>
+            </div>
+          </details>
+          <details class="acc contacts-details">
+            <summary>
+              <span class="acc-left"><span class="acc-title">🗺️ Branch map locations</span></span>
+              <span class="acc-right"><span class="acc-hint">Edit</span><span class="acc-chev">▾</span></span>
+            </summary>
+            <div class="acc-body">
+              <p class="mp-hint">Set each branch's <strong>address</strong> and its <strong>Google Maps link</strong> (used by the <strong>Get directions</strong> button on the Location page). Leave the map link blank to fall back to a name search.</p>
+              <div id="branchMapsEditor"></div>
+            </div>
+          </details>
+          <label>Email <input name="email" type="email" autocomplete="off" /></label>
+          <label>Facebook URL <input name="facebook" autocomplete="off" /></label>
+          <label>YouTube URL <input name="youtube" autocomplete="off" /></label>
+          <label>TikTok URL <input name="tiktok" autocomplete="off" /></label>
+          <label>Address <input name="address" autocomplete="off" /></label>
+          <label>Business hours <input name="hours" autocomplete="off" /></label>
+          <label>Google Maps link <input name="maps" autocomplete="off" /></label>
+          <p class="form-ok hidden" id="settingsOk">Saved — changes are live.</p>
+          <p class="form-error hidden" id="settingsErr"></p>
+          <button class="btn btn-primary" type="submit">Save settings</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="brand small" translate="no"><img src="assets/logo.jpg" alt="" /> LUCKY LION eBike — Staff Portal</div>
+    <p class="foot-note">Quality Ride, Trusted Performance.</p>
+  </footer>
+
+  <!-- profile modal -->
+  <div class="modal-backdrop hidden" id="panelModal">
+    <div class="modal" role="dialog" aria-modal="true">
+      <button class="modal-close" data-close>&times;</button>
+      <div id="panelBody"></div>
+    </div>
+  </div>
+
+  <!-- crop modal -->
+  <div class="modal-backdrop hidden" id="cropModal">
+    <div class="modal modal-sm" role="dialog" aria-modal="true">
+      <button class="modal-close" data-close>&times;</button>
+      <h3 class="modal-title">Crop photo</h3>
+      <p class="modal-note">Drag the photo to reposition · use the slider to zoom. It will be cropped to 4:3.</p>
+      <div class="crop-ratios" id="cropRatios" role="group" aria-label="Crop shape">
+        <button type="button" class="crop-ratio" data-ratio="1:1">◻ Square 1:1</button>
+        <button type="button" class="crop-ratio" data-ratio="4:3">▭ Landscape 4:3</button>
+        <button type="button" class="crop-ratio" data-ratio="3:4">▯ Portrait 3:4</button>
+      </div>
+      <div class="cropper"><canvas id="cropCanvas" width="360" height="270"></canvas></div>
+      <label style="display:block;margin:.9rem 0 .2rem;font-size:.85rem;font-weight:600">Zoom
+        <input type="range" id="cropZoom" min="0.25" max="3" step="0.01" value="1" style="width:100%" />
+      </label>
+      <p class="form-error hidden" id="cropErr"></p>
+      <button class="btn btn-ghost full" id="cropReset" type="button" style="margin-bottom:.5rem">↺ Reset position &amp; zoom</button>
+      <button class="btn btn-primary full" id="cropSave">Save photo</button>
+    </div>
+  </div>
+
+  <script src="js/config.js?v=20260827a"></script>
+  <script src="js/branches.js?v=20260917g"></script>
+  <script src="js/themes.js?v=20260827a"></script>
+  <script src="js/poster.js?v=20260916g"></script>
+  <script src="js/store.js?v=20260827a"></script>
+  <script src="js/api.js?v=20260827a"></script>
+  <script src="js/staff.js?v=20260929a"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard — PREVIEW</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css?v=20260805b" />
+  <style>
+    /* preview chrome only — not part of the app */
+    body { background: var(--sand, #f4f5f7); }
+    .preview-note { max-width: 1000px; margin: 1rem auto 0; padding: .7rem 1rem; border: 1px dashed var(--red); border-radius: 12px; color: var(--red); font: 600 .85rem/1.4 Inter, system-ui, sans-serif; }
+    main.section { max-width: 1000px; margin: 1rem auto; }
+  </style>
+</head>
+<body>
+  <div class="preview-note">⚠️ Static PREVIEW of the admin dashboard with mock data (not the live app). Delete <code>preview-admin.html</code> when done — it is not part of <code>deploy/</code>.</div>
+  <main class="section">
+    <div id="dashBody">
+      <div class="admin-dash">
+        <div class="dash-hero admin-hero">
+          <span class="avatar avatar-ph avatar-xl" aria-hidden="true">A</span>
+          <div class="dh-txt">
+            <span class="admin-eyebrow">Owner / Admin · read-only oversight</span>
+            <strong>Good afternoon, Owner</strong>
+            <span>Wednesday, August 5, 2026</span>
+          </div>
+          <div class="dh-chips">
+            <span class="dh-chip">🏢 7 branches</span>
+            <span class="dh-chip">👥 128 customers</span>
+            <span class="dh-chip">🚲 214 units in field</span>
+          </div>
+          <button class="btn btn-primary btn-sm admin-hero-cta">📈 Analytics</button>
+        </div>
+
+        <div class="admin-tiles">
+          <div class="atile atile-gold"><span class="atile-ic">🛒</span><span class="atile-body"><span class="atile-num">6</span><span class="atile-label">Sold today</span><span class="atile-sub">₱402,500</span></span></div>
+          <div class="atile atile-blue"><span class="atile-ic">📅</span><span class="atile-body"><span class="atile-num">11</span><span class="atile-label">Repairs today</span><span class="atile-sub">4 done</span></span></div>
+          <div class="atile atile-amber"><span class="atile-ic">🛠️</span><span class="atile-body"><span class="atile-num">23</span><span class="atile-label">Open repairs</span><span class="atile-sub">across all branches</span></span></div>
+          <div class="atile atile-green"><span class="atile-ic">✅</span><span class="atile-body"><span class="atile-num">87</span><span class="atile-label">Completed</span><span class="atile-sub">5 cancelled</span></span></div>
+          <div class="atile atile-red"><span class="atile-ic">💬</span><span class="atile-body"><span class="atile-num">4</span><span class="atile-label">Unread messages</span><span class="atile-sub">needs a reply</span></span></div>
+        </div>
+
+        <div class="dash-alert is-bad">
+          <span class="da-icon">⏰</span>
+          <div class="da-txt">
+            <strong>3 overdue repairs · 4 unread messages · 2 branches with out-of-stock colours</strong>
+            <span>Open Analytics for the full per-branch picture.</span>
+          </div>
+          <button class="btn btn-primary btn-sm">Open Analytics</button>
+        </div>
+
+        <div class="dash-card">
+          <div class="dc-head"><h3>Per-branch performance</h3><button class="btn btn-ghost btn-sm">📈 Full analytics →</button></div>
+          <p class="dash-sub">Tap a branch row to open it. Bar = total units sold (all-time).</p>
+          <div class="admin-table-wrap">
+            <table class="admin-table admin-grouped">
+              <thead>
+                <tr class="grp">
+                  <th class="blank"></th><th class="blank"></th>
+                  <th class="grp-start" colspan="2">🛒 Sales (units)</th>
+                  <th class="grp-start" colspan="3">🛠️ Repairs</th>
+                  <th class="grp-start" colspan="2">📦 Stock</th>
+                  <th class="grp-start">💬</th>
+                </tr>
+                <tr>
+                  <th>Branch</th><th>Customers</th>
+                  <th class="grp-start" title="Units handed to customers today">Sold today</th>
+                  <th title="Units sold all-time">Sold total</th>
+                  <th class="grp-start" title="Repairs booked or in progress (not yet finished)">Open</th>
+                  <th title="Repairs finished">Done</th>
+                  <th title="Repairs that were cancelled">Cancelled</th>
+                  <th class="grp-start" title="Colours with 0 stock in this branch">Out of stock</th>
+                  <th title="Pre-loved units available">Pre-loved</th>
+                  <th class="grp-start" title="Unread customer messages">Unread</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="is-leader"><th scope="row">⭐ Main — Buhay na Tubig, Imus</th><td>41</td><td class="grp-start"><strong>3</strong></td><td><div class="admin-bar"><span style="width:100%"></span></div><span class="admin-bar-n">72</span></td><td class="grp-start">7</td><td class="ok-num">28</td><td class="muted-num">2</td><td class="grp-start is-warn">4</td><td>3</td><td class="grp-start is-warn">2</td></tr>
+                <tr><th scope="row">Imus Branch</th><td>26</td><td class="grp-start"><strong>1</strong></td><td><div class="admin-bar"><span style="width:63%"></span></div><span class="admin-bar-n">45</span></td><td class="grp-start">5</td><td class="ok-num">19</td><td class="muted-num">1</td><td class="grp-start">2</td><td>2</td><td class="grp-start">0</td></tr>
+                <tr><th scope="row">Trece Branch</th><td>22</td><td class="grp-start"><strong>2</strong></td><td><div class="admin-bar"><span style="width:52%"></span></div><span class="admin-bar-n">38</span></td><td class="grp-start">4</td><td class="ok-num">15</td><td class="muted-num">1</td><td class="grp-start is-warn">6</td><td>1</td><td class="grp-start is-warn">1</td></tr>
+                <tr><th scope="row">Tanza Branch</th><td>15</td><td class="grp-start"><strong>0</strong></td><td><div class="admin-bar"><span style="width:35%"></span></div><span class="admin-bar-n">25</span></td><td class="grp-start">3</td><td class="ok-num">12</td><td class="muted-num">0</td><td class="grp-start">0</td><td>1</td><td class="grp-start">0</td></tr>
+                <tr><th scope="row">Naic Branch</th><td>11</td><td class="grp-start"><strong>0</strong></td><td><div class="admin-bar"><span style="width:26%"></span></div><span class="admin-bar-n">19</span></td><td class="grp-start">2</td><td class="ok-num">8</td><td class="muted-num">1</td><td class="grp-start is-warn">3</td><td>0</td><td class="grp-start is-warn">1</td></tr>
+                <tr><th scope="row">Tejero Branch</th><td>8</td><td class="grp-start"><strong>0</strong></td><td><div class="admin-bar"><span style="width:14%"></span></div><span class="admin-bar-n">10</span></td><td class="grp-start">1</td><td class="ok-num">4</td><td class="muted-num">0</td><td class="grp-start">0</td><td>0</td><td class="grp-start">0</td></tr>
+                <tr><th scope="row">GMA Branch</th><td>5</td><td class="grp-start"><strong>0</strong></td><td><div class="admin-bar"><span style="width:7%"></span></div><span class="admin-bar-n">5</span></td><td class="grp-start">1</td><td class="ok-num">1</td><td class="muted-num">0</td><td class="grp-start">0</td><td>0</td><td class="grp-start">0</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="dash-card">
+          <h3>Oversight</h3>
+          <div class="qa-grid">
+            <button class="qa"><span class="qa-icon">📈</span>Analytics</button>
+            <button class="qa"><span class="qa-icon">👥</span>Users &amp; E-Bikes</button>
+            <button class="qa"><span class="qa-icon">🛠️</span>Repairs</button>
+            <button class="qa"><span class="qa-icon">💬</span>Inbox</button>
+            <button class="qa"><span class="qa-icon">📇</span>Registry</button>
+            <button class="qa"><span class="qa-icon">📦</span>Inventory</button>
+            <button class="qa"><span class="qa-icon">🛵</span>Models</button>
+            <button class="qa"><span class="qa-icon">🎨</span>Poster</button>
+            <button class="qa"><span class="qa-icon">⚙️</span>Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

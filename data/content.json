@@ -1,0 +1,317 @@
+{
+  "_note": "Real data gathered online (2026-07). Branch details are from public listings/Facebook and should be confirmed with the owner. Road rules summarized from LTO classification guidance.",
+  "home": {
+    "brand": "Lucky Lion eBike",
+    "tagline": "Quality Ride. Trusted Performance.",
+    "_tagline_source": "brochure badge 'QUALITY RIDE TRUSTED PERFORMANCE'"
+  },
+  "mainBranch": "main",
+  "branches": {
+    "main": {
+      "name": "Lucky Lion Ebike – Main Branch (Buhay na Tubig, Imus)",
+      "address": "Emilio Aguinaldo Highway, Palico II / Buhay na Tubig, Imus City, Cavite",
+      "contactPerson": "",
+      "phone": "0921-231-9303",
+      "hours": "Open daily 8:30 AM – 5:30 PM",
+      "facebook": "https://www.facebook.com/luckylionebikecenter/",
+      "youtube": "https://www.youtube.com/channel/UCyQRwudHxGTYHNvyb-pEQ7A",
+      "tiktok": "https://www.tiktok.com/search?q=Lucky%20Lion%20Ebike",
+      "viber": "",
+      "email": "",
+      "maps": "https://www.google.com/maps/dir/?api=1&destination=Lucky%20Lion%20Ebike%2C%20Emilio%20Aguinaldo%20Highway%2C%20Buhay%20na%20Tubig%2C%20Imus%2C%20Cavite",
+      "_confirm": "main branch phone/contact person not published online — confirm with owner"
+    },
+    "imus": {
+      "name": "Lucky Lion Ebike – Imus (Robinsons) Branch",
+      "address": "1172 Emilio Aguinaldo Highway, near Robinsons Place Imus, Cavite",
+      "hours": "Open daily 8:30 AM – 5:30 PM",
+      "facebook": "https://www.facebook.com/people/Lucky-Lion-Ebike-Imus-Rob-Branch/100064000306040/",
+      "maps": "https://www.google.com/maps/dir/?api=1&destination=Lucky%20Lion%20Ebike%2C%20Robinsons%20Place%20Imus%2C%20Cavite",
+      "phone": "0930-556-8820"
+    },
+    "trece": {
+      "name": "Lucky Lion Ebike – Trece Branch",
+      "address": "13th Martyrs (Josefino Bldg), Brgy. San Agustin, Trece Martires City, Cavite (near Waltermart, beside THM Motorcycle)",
+      "contactPerson": "Jared Lina",
+      "phone": "0997-955-8909",
+      "hours": "Open daily 8:30 AM – 5:30 PM",
+      "facebook": "https://www.facebook.com/p/Lucky-Lion-Ebike-Trece-Branch-100063965447893/",
+      "youtube": "https://www.youtube.com/channel/UCyQRwudHxGTYHNvyb-pEQ7A",
+      "viber": "0997-955-8909",
+      "email": "",
+      "maps": "https://www.google.com/maps/dir/?api=1&destination=Lucky%20Lion%20Ebike%2C%2013th%20Martyrs%2C%20Brgy.%20San%20Agustin%2C%20Trece%20Martires%2C%20Cavite"
+    },
+    "tanza": {
+      "name": "Lucky Lion Ebike – Tanza Branch",
+      "address": "Tanza, Cavite",
+      "hours": "Open daily 8:30 AM – 5:30 PM",
+      "facebook": "https://www.facebook.com/Luckyliontanza/",
+      "maps": "https://www.google.com/maps/dir/?api=1&destination=Lucky%20Lion%20Ebike%2C%20Tanza%2C%20Cavite",
+      "phone": "0927-757-7572"
+    },
+    "naic": {
+      "name": "Lucky Lion Ebike – Naic Branch",
+      "address": "Ibayo Silangan, Naic, Cavite",
+      "hours": "Open daily 8:30 AM – 5:30 PM",
+      "facebook": "https://www.facebook.com/luckylionsupplier/",
+      "maps": "https://www.google.com/maps/dir/?api=1&destination=Lucky%20Lion%20Ebike%2C%20Naic%2C%20Cavite",
+      "phone": "0916-100-9832"
+    },
+    "tejero": {
+      "name": "Lucky Lion Ebike – Tejero (Gen. Trias PK2) Branch",
+      "address": "General Trias, Cavite",
+      "hours": "Open daily 8:30 AM – 5:30 PM",
+      "facebook": "https://www.facebook.com/people/Lucky-Lion-E-Bikes-GenTri-PK2-Branch/61555007090755/",
+      "maps": "https://www.google.com/maps/dir/?api=1&destination=Lucky%20Lion%20Ebike%2C%20San%20Francisco%2C%20General%20Trias%2C%20Cavite",
+      "phone": "0927-066-7173"
+    },
+    "gma": {
+      "name": "Lucky Lion Ebike – GMA Branch",
+      "address": "Unit 2 Yellowbell Subdivision, Congressional Rd., Gavino Maderan, General Mariano Alvarez (GMA), Cavite",
+      "hours": "Open daily 8:00 AM – 6:00 PM",
+      "facebook": "https://www.facebook.com/luckylionwarehouse/",
+      "maps": "https://www.google.com/maps/dir/?api=1&destination=Lucky%20Lion%20Ebike%2C%20Congressional%20Road%2C%20Gavino%20Maderan%2C%20General%20Mariano%20Alvarez%2C%20Cavite"
+    },
+    "silang": {
+      "name": "Lucky Lion Ebike – Silang Branch",
+      "address": "KM 30 Emilio Aguinaldo Highway, Silang, Cavite",
+      "hours": "Open daily 8:30 AM – 5:30 PM",
+      "facebook": "https://www.facebook.com/luckylionsilang2023/",
+      "maps": "https://www.google.com/maps/dir/?api=1&destination=Lucky%20Lion%20Ebike%2C%20Silang%2C%20Cavite",
+      "phone": "0916-100-9823"
+    },
+    "sanroque": {
+      "name": "Lucky Lion Ebike – San Roque (Naic) Branch",
+      "address": "San Roque, Naic, Cavite",
+      "phone": "0927-653-5214",
+      "email": "luckylionsanroque@gmail.com",
+      "hours": "Open daily 8:30 AM – 5:30 PM",
+      "facebook": "https://www.facebook.com/100092685738521",
+      "maps": "https://www.google.com/maps/dir/?api=1&destination=Lucky%20Lion%20Ebike%2C%20San%20Roque%2C%20Naic%2C%20Cavite"
+    }
+  },
+  "about": {
+    "_source": "Compiled from public listings/FB (Lucky Lion Electric Bicycle, main branch Imus, Cavite). Founding year not published — confirm with owner.",
+    "heading": "About Lucky Lion eBike",
+    "body": "Lucky Lion eBike is a Cavite-based electric vehicle retailer offering a wide lineup of e-bikes, e-trikes, and e-cars for everyday Filipino riders. From its main branch on Emilio Aguinaldo Highway, Palico II, Imus City, Cavite, Lucky Lion has grown to multiple branches across Cavite and Laguna — including the Trece Martires branch in Brgy. San Agustin. Every unit is backed by lifetime service, flexible payment options (cash, Home Credit installment, and credit card), and free delivery within Cavite and selected areas — Quality Ride, Trusted Performance. In December 2022, Lucky Lion was honored as the Best E-Bike Marketing Company by The World Class Philippines Awards Council."
+  },
+  "_branches_note": "9 branches: main (Buhay na Tubig, Imus — home/THIS BRANCH), imus, trece, tanza, naic, tejero, gma, silang, sanroque. Details in `branches` keyed by the same keys used across the app (see js/branches.js). All 9 now have an official Facebook page (found 2026-09-14 web search): main=luckylionebikecenter, imus=Imus-Rob (100064000306040), trece=Trece (100063965447893), tanza=Luckyliontanza, naic=luckylionsupplier, tejero=San-Francisco-Gen-Tri (100091403936637, closest to Tejero — confirm), gma=luckylionwarehouse, silang=luckylionsilang2023, sanroque=San-Roque-Naic (100092685738521). Messenger auto-derives from the FB URL (messengerUrl in app.js). GMA has a full street address; San Roque (in Naic) has a published phone 0927-653-5214 + email. Exact street addresses for Naic/Tejero/Silang still pending. Admins can override each branch's address + maps link in Site Settings (branch_maps).",
+  "payment": {
+    "options": [
+      "Cash (with discount)",
+      "Home Credit (installment)",
+      "Credit Card"
+    ],
+    "delivery": "Free delivery for Cavite & selected areas",
+    "service": "Lifetime service"
+  },
+  "whyChooseUs": {
+    "_source": "Built from real Lucky Lion facts (brochure + branch listings): free delivery, lifetime service, flexible payment, multiple branches, trusted badge.",
+    "heading": "Why Choose Lucky Lion?",
+    "points": [
+      {
+        "title": "Quality Ride, Trusted Performance",
+        "text": "Wide lineup of e-bikes, e-trikes, and e-cars built for everyday Filipino roads.",
+        "short": "Quality original official product"
+      },
+      {
+        "title": "Free Delivery",
+        "text": "Free delivery within Cavite and selected areas.",
+        "short": "Free delivery"
+      },
+      {
+        "title": "Lifetime Service",
+        "text": "Ongoing service support for your unit, long after purchase.",
+        "short": "Lifetime service"
+      },
+      {
+        "title": "Flexible Payment",
+        "text": "Pay via Cash (with discount), Home Credit installment, or Credit Card.",
+        "short": "Flexible payment"
+      },
+      {
+        "title": "Branches Near You",
+        "text": "Multiple branches across Cavite and Laguna, including Trece Martires.",
+        "short": "Many branches in Cavite"
+      }
+    ]
+  },
+  "maintenance": {
+    "heading": "General Maintenance",
+    "intro": "Simple, regular care keeps any Lucky Lion e-bike, e-trike, or e-car safe and long-lasting. These general guidelines apply to all units.",
+    "categories": [
+      {
+        "category": "Battery & Charging",
+        "items": [
+          "Recharge after every use — don't let a lead-acid battery sit fully drained.",
+          "Use only the original charger; unplug once fully charged (about 6–8 hours).",
+          "Let the unit cool ~30 minutes after riding before charging; charge in a cool, dry, ventilated place.",
+          "If unused for a while, recharge at least once a month to prevent battery damage.",
+          "Keep battery terminals clean and dry — never expose the battery to rain or water."
+        ]
+      },
+      {
+        "category": "Brakes & Tires",
+        "items": [
+          "Test the brakes before every ride — they should feel firm and stop smoothly.",
+          "Have disc/drum brakes adjusted if they feel loose, weak, or noisy.",
+          "Check tire pressure weekly and keep it at the recommended level for safety and range.",
+          "Inspect tires for cuts, wear, or embedded objects; replace when the tread is low.",
+          "Make sure wheel nuts and axles are tight."
+        ]
+      },
+      {
+        "category": "Motor, Controller & Wiring",
+        "items": [
+          "Listen for unusual motor noises — have it checked if it grinds or hesitates.",
+          "Keep wiring and connectors dry; avoid deep water and flooded roads.",
+          "Don't overload beyond the rated capacity — it strains the motor and controller.",
+          "If the unit loses power or cuts out, stop and have the controller and connections inspected."
+        ]
+      },
+      {
+        "category": "Cleaning & Storage",
+        "items": [
+          "Wipe with a damp cloth — never pressure-wash or hose down the electricals or battery.",
+          "Dry the unit thoroughly after cleaning or riding in the rain.",
+          "Store in a covered, dry place away from direct sun and rain.",
+          "For long storage, keep the battery around half-to-full charge and top it up monthly."
+        ]
+      },
+      {
+        "category": "Routine Safety Checks (before riding)",
+        "items": [
+          "Brakes firm, tires inflated, and lights / horn / signals working.",
+          "Mirrors and seat secure; bolts tight.",
+          "Battery charged and locked securely in place.",
+          "Wear a helmet appropriate to your unit's class (see Road Rules)."
+        ]
+      },
+      {
+        "category": "Common Issues & Quick Fixes",
+        "items": [
+          "Won't turn on: check the battery charge, main switch, and battery connector.",
+          "Reduced range: check tire pressure, avoid overloading; the battery may need servicing.",
+          "Brakes rubbing or weak: they need adjustment — visit the branch.",
+          "Charger light behaving oddly: let the battery cool, reseat the charger; if it persists, have it checked.",
+          "For anything electrical or persistent, contact Lucky Lion Trece — units include lifetime service."
+        ]
+      }
+    ]
+  },
+  "roadRules": {
+    "_source": "Summarized from LTO classification of e-bikes / light electric vehicles (ltoportal.ph, LTO AO 2021-039 / MC VDM-2024). NOTE: as of Oct 2024 the DOTr ordered LTO to SUSPEND registration/license/helmet enforcement for e-bikes & e-trikes pending EVIDA-aligned rules — show this as a status banner.",
+    "status": "As of late 2024, LTO suspended registration, license, and helmet enforcement for e-bikes/e-trikes pending new EVIDA-aligned guidelines. Rules below are the LTO classification framework; verify current enforcement locally.",
+    "classes": [
+      {
+        "class": "PMS (Personal Mobility Scooter)",
+        "power": "<300W, max 12.5 km/h, 3–4 wheels",
+        "helmet": "Bicycle helmet",
+        "license": "Not required",
+        "registration": "Not required",
+        "roads": "Private roads, pedestrian walkways, bike lanes"
+      },
+      {
+        "class": "L1a (E-Bike / E-Moped, 2W)",
+        "power": "Max 25 km/h",
+        "helmet": "Bicycle helmet",
+        "license": "Not required",
+        "registration": "Not required",
+        "roads": "Bike lanes / local barangay roads"
+      },
+      {
+        "class": "L1b (Light E-Scooter, 2W)",
+        "power": "26–50 km/h",
+        "helmet": "Motorcycle helmet",
+        "license": "Not required",
+        "registration": "Not required",
+        "roads": "Road edges beyond barangay roads; may cross main thoroughfares"
+      },
+      {
+        "class": "L2a (E-Moped, 3W)",
+        "power": "Max 25 km/h",
+        "helmet": "Bicycle helmet",
+        "license": "Not required",
+        "registration": "Not required",
+        "roads": "Private/barangay roads, bike lanes"
+      },
+      {
+        "class": "L2b (E-Moped, 3W)",
+        "power": "26–50 km/h",
+        "helmet": "Motorcycle helmet",
+        "license": "Required",
+        "registration": "Required",
+        "roads": "Local roads beyond barangay; national road crossings with yield"
+      },
+      {
+        "class": "L3 (E-Motorcycle)",
+        "power": ">50 km/h",
+        "helmet": "Motorcycle helmet",
+        "license": "Required",
+        "registration": "Required",
+        "roads": "All roads except limited-access expressways"
+      },
+      {
+        "class": "L4 / L5 (E-Trike)",
+        "power": "min 1000W, max 50 km/h, 3W",
+        "helmet": "Not required",
+        "license": "Required",
+        "registration": "Required",
+        "roads": "Local/tertiary roads; national roads per ordinance; no expressways"
+      },
+      {
+        "class": "L6 / L7 (E-Quad / E-Car)",
+        "power": "L6 ≤350kg/≤4kW; L7 ≤550kg/≤15kW",
+        "helmet": "Not required",
+        "license": "Required",
+        "registration": "Required",
+        "roads": "Local/tertiary roads; national roads with right-of-way; no expressways"
+      }
+    ]
+  },
+  "tips": [
+    {
+      "category": "Battery Care & Range Maximization (The Tech)",
+      "items": [
+        "Recharge after every use — don't let a lead-acid battery sit empty; deep discharge shortens its life.",
+        "Charge fully (about 6–8 hours) and unplug once full to avoid overcharging.",
+        "Charge and store in a cool, dry, well-ventilated place — away from direct heat.",
+        "If the e-bike is idle, top up the charge at least once a month to prevent sulfation.",
+        "Smooth acceleration and steady, moderate speeds stretch your range per charge.",
+        "Keep tires at the correct pressure and avoid overloading to get the most range."
+      ]
+    },
+    {
+      "category": "Riding Technique & Safety (The Ride)",
+      "items": [
+        "Always wear the correct helmet for your unit's class (bicycle or motorcycle helmet).",
+        "Do a quick pre-ride check: brakes, tires, lights, horn.",
+        "Signal your turns, obey traffic lights, and keep to bike lanes / roads allowed for your class.",
+        "Don't exceed the rated passenger/cargo capacity of your unit.",
+        "Slow down on wet, gravel, or uneven surfaces; avoid flooded roads to protect the motor and battery.",
+        "Keep both hands on the handlebars and avoid using your phone while riding."
+      ]
+    },
+    {
+      "category": "Maintenance & Mechanicals (The Hardware)",
+      "items": [
+        "Check tire pressure weekly and inspect for wear.",
+        "Test and adjust the brakes (disc/drum) regularly for safe stopping.",
+        "Re-tighten bolts and fasteners, especially in the first weeks of use.",
+        "Clean with a damp cloth — never pressure-wash the electricals or battery box.",
+        "Keep lights, horn, and signals working.",
+        "Bring your unit in for periodic servicing — Lucky Lion offers lifetime service."
+      ]
+    },
+    {
+      "category": "Purchasing & Legalities (The Rules)",
+      "items": [
+        "Know your unit's LTO class — it decides whether a helmet, license, or registration is needed (see Road Rules).",
+        "Keep your official receipt and warranty papers safe.",
+        "Payment options: Cash (with discount), Home Credit installment, or Credit Card.",
+        "If your class requires it (L2b, L3, L4/L5, L6/L7), complete LTO registration and licensing.",
+        "Follow your local ordinance on where light electric vehicles may be driven."
+      ]
+    }
+  ]
+}

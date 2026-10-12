@@ -1,0 +1,282 @@
+{
+  "_source": "Lucky Lion brochure LUCKY-AGILA-V2 (2026-07-02). SRP prices subject to change without prior notice.",
+  "_payment": [
+    "Cash",
+    "Home Credit",
+    "Credit Card"
+  ],
+  "_delivery": "Free delivery for Cavite & selected areas",
+  "_images_howto": "Put photos in assets/products/<id>/ and list them in each model's images[]. The FIRST image is the main/uniform-angle card photo; the rest show as extra angles in the gallery. Empty images[] falls back to a placeholder graphic.",
+  "categories": {
+    "4-wheels": "4 Wheels",
+    "3-wheels": "3 Wheels",
+    "2-wheels": "2 Wheels"
+  },
+  "models": [
+    {
+      "id": "lucky-agila-v2",
+      "name": "Lucky Agila V2",
+      "wheels": "4-wheels",
+      "motorW": 1500,
+      "battery": "60V/45AH Lead Acid",
+      "brakes": "Front & Rear Disc Brake",
+      "srp": 141600,
+      "images": [
+        "assets/products/lucky-agila-v2/main.jpg"
+      ]
+    },
+    {
+      "id": "k4004-v4",
+      "name": "K4004 V4 (Throttle Type)",
+      "wheels": "4-wheels",
+      "motorW": 1500,
+      "battery": "60V/20AH Lead Acid",
+      "brakes": "Rear Drum Brake",
+      "srp": 70800,
+      "images": [
+        "assets/products/k4004-v4/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-lion-e-car",
+      "name": "Lucky Lion E-Car",
+      "wheels": "4-wheels",
+      "motorW": 2000,
+      "battery": "60V/65AH Lead Acid",
+      "brakes": "Rear Disc Brake",
+      "srp": 212400,
+      "images": [
+        "assets/products/lucky-lion-e-car/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-golf-v-plus-v4",
+      "name": "Lucky Golf V+ V4",
+      "wheels": "4-wheels",
+      "motorW": 1000,
+      "battery": "60V/32AH Lead Acid",
+      "brakes": "Rear Drum Brake",
+      "srp": 82600,
+      "images": [
+        "assets/products/lucky-golf-v-plus-v4/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-golf-v-plus-v5",
+      "name": "Lucky Golf V+ V5",
+      "wheels": "4-wheels",
+      "motorW": 1200,
+      "battery": "60V/45AH Lead Acid",
+      "brakes": "Rear Drum Brake",
+      "srp": 88500,
+      "images": [
+        "assets/products/lucky-golf-v-plus-v5/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-golf-v-plus-v6",
+      "name": "Lucky Golf V+ V6",
+      "wheels": "4-wheels",
+      "motorW": 800,
+      "battery": "60V/20AH Lead Acid",
+      "brakes": "Rear Drum Brake",
+      "srp": 76700,
+      "images": [
+        "assets/products/lucky-golf-v-plus-v6/main.jpg"
+      ]
+    },
+    {
+      "id": "honor-v1",
+      "name": "Honor V1",
+      "wheels": "4-wheels",
+      "motorW": 1500,
+      "battery": "60V/32AH Lead Acid",
+      "brakes": "Rear Disc Brake",
+      "srp": 88500,
+      "images": [
+        "assets/products/honor-v1/main.jpg"
+      ]
+    },
+    {
+      "id": "honor-v3",
+      "name": "Honor V3",
+      "wheels": "4-wheels",
+      "motorW": 2500,
+      "battery": "60V/45AH Lead Acid",
+      "brakes": "Front & Rear Disc Brake",
+      "srp": 159300,
+      "images": [
+        "assets/products/honor-v3/main.jpg"
+      ]
+    },
+    {
+      "id": "kt31s",
+      "name": "KT31S",
+      "wheels": "4-wheels",
+      "motorW": 1200,
+      "battery": "60V/20AH Lead Acid",
+      "brakes": "Rear Drum Brake",
+      "srp": 88500,
+      "images": [
+        "assets/products/kt31s/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-god-plus-r3-v2",
+      "name": "Lucky God Plus R3 V2",
+      "wheels": "3-wheels",
+      "motorW": 650,
+      "battery": "60V/20AH Lead Acid",
+      "brakes": "Front Disc Brake & Rear Drum Brake",
+      "srp": 62540,
+      "images": [
+        "assets/products/lucky-god-plus-r3-v2/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-god-super-v2",
+      "name": "Lucky God Super V2",
+      "wheels": "3-wheels",
+      "motorW": 650,
+      "battery": "60V/20AH Lead Acid",
+      "brakes": "All Disc Brake",
+      "srp": 62540,
+      "images": [
+        "assets/products/lucky-god-super-v2/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-god-super-v3",
+      "name": "Lucky God Super V3",
+      "wheels": "3-wheels",
+      "motorW": 650,
+      "battery": "60V/20AH Lead Acid",
+      "brakes": "All Disc Brake",
+      "srp": 59000,
+      "images": [
+        "assets/products/lucky-god-super-v3/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-god-super-v4",
+      "name": "Lucky God Super V4",
+      "wheels": "3-wheels",
+      "motorW": 1500,
+      "battery": "60V/32AH Lead Acid",
+      "brakes": "Front Disc Brake / Rear Drum Brake",
+      "srp": 70800,
+      "images": [
+        "assets/products/lucky-god-super-v4/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-god-super-v5",
+      "name": "Lucky God Super V5",
+      "wheels": "3-wheels",
+      "motorW": 800,
+      "battery": "60V/20AH Lead Acid",
+      "brakes": "Front Disc Brake / Rear Drum Brake",
+      "srp": 64900,
+      "images": [
+        "assets/products/lucky-god-super-v5/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-god-super-v6",
+      "name": "Lucky God Super V6",
+      "wheels": "3-wheels",
+      "motorW": 800,
+      "battery": "60V/20AH Lead Acid",
+      "brakes": "All Drum Brake",
+      "srp": 64900,
+      "images": [
+        "assets/products/lucky-god-super-v6/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-god-super-v7",
+      "name": "Lucky God Super V7",
+      "wheels": "3-wheels",
+      "motorW": 800,
+      "battery": "60V/30AH Lead Acid",
+      "brakes": "All Drum Brake",
+      "srp": 76700,
+      "images": [
+        "assets/products/lucky-god-super-v7/main.jpg"
+      ],
+      "_note": "brochure label cut off ('Lucky God Super V…') — assumed V7, confirm"
+    },
+    {
+      "id": "big-cargo",
+      "name": "Big Cargo",
+      "wheels": "3-wheels",
+      "motorW": 1500,
+      "battery": "60V/45AH Lead Acid",
+      "brakes": "Front Disc Brake / Rear Drum Brake",
+      "srp": 82600,
+      "images": [
+        "assets/products/big-cargo/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-sheep-plus-v8",
+      "name": "Lucky Sheep Plus V8",
+      "wheels": "3-wheels",
+      "motorW": 1000,
+      "battery": "48V/20AH Lead Acid",
+      "brakes": "Front Disc Brake / Rear Drum Brake",
+      "srp": 49560,
+      "images": [
+        "assets/products/lucky-sheep-plus-v8/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-bee",
+      "name": "Lucky Bee",
+      "wheels": "3-wheels",
+      "motorW": 1000,
+      "battery": "48V/20AH Lead Acid",
+      "brakes": "Front Disc Brake / Rear Drum Brake",
+      "srp": 41300,
+      "images": [
+        "assets/products/lucky-bee/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-eagle",
+      "name": "Lucky Eagle",
+      "wheels": "2-wheels",
+      "motorW": 1200,
+      "battery": "60V/20AH Lead Acid",
+      "brakes": "Front Disc Brake / Rear Drum Brake",
+      "srp": 42480,
+      "images": [
+        "assets/products/lucky-eagle/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-turtle",
+      "name": "Lucky Turtle",
+      "wheels": "2-wheels",
+      "motorW": 1200,
+      "battery": "60V/20AH Lead Acid",
+      "brakes": "Front Disc Brake / Rear Drum Brake",
+      "srp": 41300,
+      "images": [
+        "assets/products/lucky-turtle/main.jpg"
+      ]
+    },
+    {
+      "id": "lucky-deer",
+      "name": "Lucky Deer",
+      "wheels": "2-wheels",
+      "motorW": 500,
+      "battery": "48V/20AH Lead Acid",
+      "brakes": "All Drum Brake",
+      "srp": 29500,
+      "images": [
+        "assets/products/lucky-deer/main.jpg"
+      ]
+    }
+  ]
+}

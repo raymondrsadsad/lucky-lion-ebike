@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Store Gallery — layout mockup</title>
+<style>
+  :root{--red:#e11b22;--ink:#141414;--gold:#f5b301;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:#eceef2;color:#141414;}
+  h2{text-align:center;margin:1.4rem 0 .2rem;}
+  .sub{text-align:center;color:#666;margin:0 0 1rem;font-size:.9rem;}
+  .wrap{max-width:1100px;margin:0 auto;padding:1rem;}
+
+  /* hero */
+  .hero{position:relative;color:#fff;border-radius:16px;overflow:hidden;
+    background:radial-gradient(900px 380px at 50% -10%,rgba(225,27,34,.5),transparent 62%),
+      linear-gradient(160deg,#1f1f1f,#141414 55%,#060606);
+    padding:2.4rem 1rem;display:grid;grid-template-columns:1fr auto 1fr;gap:1.2rem;align-items:center;}
+  .side{display:flex;flex-direction:column;gap:1rem;align-items:center;}
+  .side.left{align-items:flex-end;} .side.right{align-items:flex-start;}
+  .center{text-align:center;min-width:230px;}
+  .logo{width:96px;height:96px;border-radius:50%;margin:0 auto .6rem;
+    box-shadow:0 0 0 3px rgba(225,27,34,.9);display:grid;place-items:center;font-size:2.4rem;background:#111;}
+  .brand{font-size:2rem;font-weight:900;letter-spacing:-.5px;}
+  .brand span{color:var(--red);}
+  .tag{color:var(--gold);font-weight:700;margin:.3rem 0 .8rem;}
+  .cta{display:inline-block;background:var(--red);color:#fff;border-radius:999px;padding:.5rem 1.1rem;font-weight:700;font-size:.85rem;}
+
+  /* polaroid */
+  .pol{background:#fff;padding:6px 6px 6px;border-radius:6px;box-shadow:0 10px 24px rgba(0,0,0,.35);transform:rotate(var(--r,-2deg));}
+  .pol .ph{width:120px;height:92px;border-radius:3px;position:relative;overflow:hidden;}
+  .pol .ph i{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:1.4rem;
+    font-style:normal;transition:opacity .8s ease;}
+  .pol.small .ph{width:96px;height:74px;}
+
+  /* phone frames */
+  .phones{display:flex;gap:2rem;justify-content:center;flex-wrap:wrap;margin-top:1rem;}
+  .phone{width:300px;background:#000;border-radius:28px;padding:12px;box-shadow:0 14px 40px rgba(0,0,0,.3);}
+  .screen{background:#141414;border-radius:18px;overflow:hidden;color:#fff;text-align:center;padding:1.4rem .8rem 1.6rem;}
+  .screen .logo{width:70px;height:70px;font-size:1.7rem;}
+  .screen .brand{font-size:1.4rem;}
+  .screen .tag{font-size:.8rem;}
+  .label{text-align:center;font-weight:800;margin-top:.6rem;}
+  .label small{display:block;font-weight:400;color:#666;}
+  /* option A: 2x2 grid */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;justify-items:center;margin-top:1rem;}
+  /* option B: single */
+  .single{margin-top:1rem;display:flex;justify-content:center;}
+  .single .pol .ph{width:190px;height:130px;}
+  .dots{display:flex;gap:5px;justify-content:center;margin-top:.6rem;}
+  .dots i{width:6px;height:6px;border-radius:50%;background:#555;}
+  .dots i.on{background:var(--red);}
+  @media(max-width:560px){.hero{grid-template-columns:1fr;}.side{flex-direction:row;justify-content:center;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h2>Store Gallery — how it looks</h2>
+  <p class="sub">Placeholder photos below just show the layout &amp; the cross-fade slideshow. Real ones are uploaded by staff.</p>
+
+  <!-- DESKTOP -->
+  <div class="label">DESKTOP / TABLET</div>
+  <div class="hero">
+    <div class="side left">
+      <div class="pol" style="--r:-3deg"><div class="ph" data-slot></div></div>
+      <div class="pol" style="--r:2deg"><div class="ph" data-slot></div></div>
+    </div>
+    <div class="center">
+      <div class="logo">🦁</div>
+      <div class="brand">LUCKY <span>LION</span></div>
+      <div class="tag">Quality Ride. Trusted Performance.</div>
+      <span class="cta">Browse Models</span>
+    </div>
+    <div class="side right">
+      <div class="pol" style="--r:3deg"><div class="ph" data-slot></div></div>
+      <div class="pol" style="--r:-2deg"><div class="ph" data-slot></div></div>
+    </div>
+  </div>
+
+  <!-- PHONE OPTIONS -->
+  <div class="phones">
+    <div>
+      <div class="phone"><div class="screen">
+        <div class="logo">🦁</div><div class="brand">LUCKY <span style="color:var(--red)">LION</span></div>
+        <div class="tag" style="color:var(--gold)">Quality Ride.</div>
+        <div class="grid2">
+          <div class="pol small" style="--r:-3deg"><div class="ph" data-slot></div></div>
+          <div class="pol small" style="--r:2deg"><div class="ph" data-slot></div></div>
+          <div class="pol small" style="--r:2deg"><div class="ph" data-slot></div></div>
+          <div class="pol small" style="--r:-2deg"><div class="ph" data-slot></div></div>
+        </div>
+      </div></div>
+      <div class="label">Option A — 2×2 grid<small>all 4 photos below the logo</small></div>
+    </div>
+
+    <div>
+      <div class="phone"><div class="screen">
+        <div class="logo">🦁</div><div class="brand">LUCKY <span style="color:var(--red)">LION</span></div>
+        <div class="tag" style="color:var(--gold)">Quality Ride.</div>
+        <div class="single"><div class="pol" style="--r:-2deg"><div class="ph" data-slot></div></div></div>
+        <div class="dots"><i class="on"></i><i></i><i></i><i></i></div>
+      </div></div>
+      <div class="label">Option B — single rotating<small>one big photo, fades through them</small></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // fake store photos = colored gradients with an icon, cross-fading to show the slideshow
+  const pics = [
+    ['#c94b4b','#4b134f','🏪'], ['#2b5876','#4e4376','🛵'], ['#134e5e','#71b280','🏬'],
+    ['#e65c00','#f9d423','🛺'], ['#41295a','#2f0743','🚗'], ['#1a2980','#26d0ce','🏪'],
+    ['#603813','#b29f94','🛵'], ['#16222a','#3a6073','🏬']
+  ];
+  const slots=[...document.querySelectorAll('[data-slot]')];
+  slots.forEach((s,i)=>{ s.innerHTML='<i></i>'; paint(s, i%pics.length); s._k=i%pics.length; });
+  function paint(s,k){const p=pics[k];s.style.background=`linear-gradient(135deg,${p[0]},${p[1]})`;s.querySelector('i').textContent=p[2];}
+  setInterval(()=>{ // stagger: fade one slot at a time
+    const s = slots[Math.floor(Math.random()*slots.length)];
+    const ic=s.querySelector('i'); ic.style.opacity=0;
+    setTimeout(()=>{ s._k=(s._k+1)%pics.length; paint(s,s._k); ic.style.opacity=1; },400);
+  },900);
+</script>
+</body>
+</html>
