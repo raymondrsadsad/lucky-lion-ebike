@@ -1856,7 +1856,7 @@ async function renderInbox() {
     .sort((a, b) => (b.last.createdAt || '').localeCompare(a.last.createdAt || ''));
 
   const branchBar = isAdmin()
-    ? `<div class="branch-bar"><label>Branch <select id="inboxBranchSel">${branchOptionsHtml(INBOX_BRANCH === 'all' ? '' : INBOX_BRANCH, { all: true, allLabel: 'All branches' })}</select></label><span class="ro-tag">👁 Admin — monitor only</span></div>`
+    ? `<div class="branch-bar"><label>Branch <select id="inboxBranchSel">${branchOptionsHtml(INBOX_BRANCH === 'all' ? '' : INBOX_BRANCH, { all: true, allLabel: 'All branches' })}</select></label><span class="ro-tag ok">✏️ Admin — all branches</span></div>`
     : '';
   host.innerHTML = branchBar + `<div class="inbox-wrap${INBOX_OPEN ? ' has-open' : ''}" id="inboxWrap">
       <div class="inbox-threads" id="inboxThreads"></div>
@@ -1898,7 +1898,7 @@ async function paintConversation() {
   try { msgs = await API.getMessages(userId); } catch { }
   try { u = (await API.getUsers()).find(x => x.id === userId); } catch { }
   const name = u ? (u.name || u.username) : '(customer)';
-  const readOnly = isAdmin();   // admin monitors conversations but does not reply
+  const readOnly = false;   // #10: admin can reply too (full access), not just monitor
   host.innerHTML = `
     <div class="conv">
       <div class="conv-head">
@@ -2195,7 +2195,7 @@ function custRow(u, canEdit = true) {
   const firstModel = models.length ? models[0].id : '';
   return `<details class="acc" data-user="${esc(u.id)}">
     <summary>
-      <span class="acc-left"><span class="acc-title">${esc(u.name || u.username)}</span> <span class="home-badge">${esc(u.memberId || 'CUST')}</span></span>
+      <span class="acc-left"><span class="acc-title">${esc(u.name || u.username)}</span></span>
       <span class="acc-right"><span class="acc-hint">Tap to expand</span><span class="acc-chev">▾</span></span>
     </summary>
     <div class="acc-body">
@@ -2241,7 +2241,8 @@ function staffRow(u) {
 }
 
 // staff can edit the branch they belong to; admins are read-only oversight everywhere
-const canEditBranch = (branch) => !isAdmin() && branch === myBranch();
+// #10: admin has full edit access across every branch; staff edit only their own.
+const canEditBranch = (branch) => isAdmin() || branch === myBranch();
 
 function renderCustList() {
   const q = CUST_QUERY.toLowerCase().trim();
@@ -2268,7 +2269,7 @@ async function renderUsers() {
   $('#usersList').innerHTML =
     `<div class="branch-bar">
        <label>Branch <select id="usersBranchSel">${branchOptionsHtml(USERS_BRANCH)}</select></label>
-       ${isAdmin() ? '<span class="ro-tag">👁 Admin — view only</span>' : '<span class="b-meta">You can edit only your own branch.</span>'}
+       ${isAdmin() ? '<span class="ro-tag ok">✏️ Admin — full access</span>' : '<span class="b-meta">You can edit only your own branch.</span>'}
      </div>
      <h3 id="custHead" style="margin:1rem 0 .6rem"></h3>
      <input class="user-search" id="custSearch" type="search" autocomplete="off" aria-label="Search customers" placeholder="Search customers by name, username, ID, phone…" value="${esc(CUST_QUERY)}" />

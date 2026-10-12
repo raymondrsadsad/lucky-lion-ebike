@@ -94,6 +94,7 @@ function confirmAction(message, opts = {}) {
 let C = {};        // content.json cache
 let MODELS = [];   // effective models (base products.json + staff model_meta)
 let MY_EBIKES = []; // the signed-in customer's owned units (full rows, incl. serials)
+let JUST_ONBOARDED = false; // true right after a forced temp-password change → prompt profile completion
 
 // compact, present-only detail bits for one owned unit
 function unitBits(e) {
@@ -944,6 +945,32 @@ function wireLogin() {
     closePublicDrawer();
   }));
   wireNotifications();   // #16: notification bell
+
+  // right-side profile avatar menu (My Profile / Log out)
+  const avatarBtn = $('#memberAvatarBtn'), avatarDrop = $('#memberAvatarDropdown');
+  if (avatarBtn && avatarDrop) {
+    avatarBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const show = avatarDrop.classList.toggle('hidden') === false;
+      avatarBtn.setAttribute('aria-expanded', String(show));
+    });
+    document.addEventListener('click', e => { if (!e.target.closest('#memberAvatarMenu')) avatarDrop.classList.add('hidden'); });
+    const apb = $('#avatarProfileBtn');
+    if (apb) apb.addEventListener('click', () => { avatarDrop.classList.add('hidden'); openPanel('profile'); });
+  }
+}
+// render the header avatar (photo or initial) + the dropdown name
+function updateMemberAvatar(user) {
+  const img = $('#memberAvatarImg'), nameEl = $('#memberAvatarName');
+  if (nameEl) nameEl.textContent = user ? (user.name || user.username) : 'Member';
+  if (!img) return;
+  if (user && user.avatarUrl) {
+    img.classList.remove('avatar-ph');
+    img.innerHTML = `<img src="${esc(user.avatarUrl)}" alt="" />`;
+  } else {
+    img.classList.add('avatar-ph');
+    img.textContent = ((user && (user.name || user.username) || 'U').trim()[0] || 'U').toUpperCase();
+  }
 }
 function openPublicDrawer() {
   const d = $('#publicDrawer'), s = $('#publicScrim'), b = $('#navDrawerBtn');
@@ -1025,9 +1052,15 @@ async function refreshAuthUI() {
   // #3: one left drawer for everyone; body.logged-in toggles guest vs member items (CSS).
   document.body.classList.toggle('logged-in', loggedIn);
   $('#memberName').textContent = loggedIn ? `Hi, ${user.name || user.username}` : 'Lucky Lion';
+  updateMemberAvatar(user);   // header profile photo + dropdown name
 
-  // #8: a customer on a temporary password must set a new one before using the system.
-  if (loggedIn && user.role === 'customer' && user.mustChangePassword) { await forcePasswordChange(user); }
+  // #8: a customer on a temporary password must set a new one, then complete their details.
+  if (loggedIn && user.role === 'customer' && user.mustChangePassword) {
+    await forcePasswordChange(user);
+    JUST_ONBOARDED = true;                    // ask them to fill in their info + photo next
+    location.hash = '#account';
+    openPanel('profile');
+  }
 
   // unread-message indicator + schedule notifications + light poll while a customer is signed in
   clearInterval(MEMBER_BADGE_POLL); MEMBER_BADGE_POLL = null;
@@ -1398,16 +1431,29 @@ async function panelProfile(user) {
   try { names = (await API.getUserEbikes(user.id)).map(e => (STORE.modelById(e.model_id) || {}).name || e.model_id); } catch { }
   if (!names.length && user.ownedModelId) { const m = STORE.modelById(user.ownedModelId); if (m) names = [m.name]; }
   const unitsText = names.length ? 'Your e-bike(s): <strong>' + esc(names.join(', ')) + '</strong>' : 'No e-bike linked yet.';
-  return `<h3 class="panel-title">Profile</h3>
+  const onboard = JUST_ONBOARDED; JUST_ONBOARDED = false;   // show the welcome prompt once
+  const av = user.avatarUrl
+    ? `<span class="avatar avatar-xl" id="profAvatar"><img src="${esc(user.avatarUrl)}" alt="" /></span>`
+    : `<span class="avatar avatar-ph avatar-xl" id="profAvatar">${esc(((user.name || user.username || 'U').trim()[0] || 'U').toUpperCase())}</span>`;
+  return `<h3 class="panel-title">My Profile</h3>
     <p class="panel-sub">${unitsText}</p>
+    ${onboard ? `<div class="reminder-banner">👋 <strong>Welcome!</strong> Your password is set. Please complete your details below and add a profile photo.</div>` : ''}
+    <div class="prof-photo">
+      ${av}
+      <div>
+        <label class="btn btn-ghost btn-sm" for="profPhotoInput">📷 ${user.avatarUrl ? 'Change' : 'Add'} photo</label>
+        <input type="file" id="profPhotoInput" accept="image/*" hidden aria-label="Upload profile photo" />
+        <p class="prof-photo-hint">A clear photo helps the branch recognise you.</p>
+      </div>
+    </div>
     <form class="form" id="profileForm">
-      <label>Full name <input name="name" value="${esc(user.name)}" /></label>
+      <label>Full name <input name="name" value="${esc(user.name)}" required /></label>
       <label>Email <input name="email" type="email" value="${esc(user.email)}" /></label>
-      <label>Phone <input name="phone" value="${esc(user.phone)}" /></label>
-      <label>Address <input name="address" value="${esc(user.address)}" /></label>
-      <label>Nearest branch <select name="branch">${branchOptionsHtml(user.branch)}</select></label>
+      <label>Phone <input name="phone" value="${esc(user.phone)}" required /></label>
+      <label>Address <input name="address" value="${esc(user.address)}" required /></label>
+      <label>Nearest branch <select name="branch" required>${branchOptionsHtml(user.branch)}</select></label>
       <p class="form-ok hidden" id="profOk">Saved.</p>
-      <button class="btn btn-primary" type="submit">Save changes</button>
+      <button class="btn btn-primary full" type="submit">Save changes</button>
     </form>
     <hr style="margin:1.4rem 0;border:0;border-top:1px solid var(--line)">
     <h4 style="margin-bottom:.6rem">Change password</h4>
@@ -1420,13 +1466,31 @@ async function panelProfile(user) {
     </form>`;
 }
 function wireProfile(user) {
+  // profile photo upload → shared store-photos bucket, saved on the user
+  const photoInput = $('#profPhotoInput');
+  if (photoInput) photoInput.addEventListener('change', async () => {
+    const file = photoInput.files && photoInput.files[0];
+    if (!file) return;
+    try {
+      toast('Uploading photo…');
+      const url = await API.uploadAvatar(file);
+      await API.updateUser(user.id, { avatarUrl: url });
+      user.avatarUrl = url;
+      const av = $('#profAvatar'); if (av) { av.classList.remove('avatar-ph'); av.innerHTML = `<img src="${esc(url)}" alt="" />`; }
+      updateMemberAvatar(user);   // refresh the header avatar immediately
+      toast('Profile photo updated. 📷');
+    } catch (ex) { toast('Photo upload failed: ' + ex.message, 'err'); }
+    finally { photoInput.value = ''; }
+  });
   $('#profileForm').addEventListener('submit', async e => {
     e.preventDefault();
     if (!(await confirmAction('Save these changes to your profile?', { title: 'Save profile', confirmLabel: 'Save changes' }))) return;
     const f = new FormData(e.target);
     await API.updateUser(user.id, { name: f.get('name'), email: f.get('email'), phone: f.get('phone'), address: f.get('address'), branch: f.get('branch') || user.branch });
+    user.name = f.get('name');
     $('#profOk').classList.remove('hidden');
     $('#memberName').textContent = `Hi, ${f.get('name') || user.username}`;
+    updateMemberAvatar(user);
     toast('Profile saved.');
   });
   $('#pwForm').addEventListener('submit', async e => {

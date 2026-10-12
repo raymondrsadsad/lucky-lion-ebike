@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css?v=20261012a" />
+  <link rel="stylesheet" href="css/styles.css?v=20261012c" />
 </head>
 <body>
   <div id="themeDecor" aria-hidden="true"></div>
@@ -33,7 +33,7 @@
         <span class="brand-text" translate="no">LUCKY&nbsp;LION</span>
       </a>
 
-      <!-- top-right: socials + (member) notification bell -->
+      <!-- top-right: socials + (member) notification bell + profile avatar menu -->
       <div class="nav-right">
         <div class="socials" id="hdrSocials"></div>
         <div class="notif member-only" id="notifWrap">
@@ -41,6 +41,15 @@
           <div class="notif-panel hidden" id="notifPanel">
             <div class="notif-head">Notifications</div>
             <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+        <!-- customer profile avatar (shown when logged in) → My Profile / Log out -->
+        <div class="member-menu member-only" id="memberAvatarMenu">
+          <button class="avatar-btn" id="memberAvatarBtn" aria-label="Account menu" aria-expanded="false"><span class="avatar avatar-ph" id="memberAvatarImg">U</span></button>
+          <div class="dropdown hidden" id="memberAvatarDropdown">
+            <div class="dropdown-head" id="memberAvatarName">Member</div>
+            <button data-panel="profile" id="avatarProfileBtn">🪪 My Profile</button>
+            <button class="danger" id="logoutBtn">⏻ Log out</button>
           </div>
         </div>
       </div>
@@ -84,7 +93,6 @@
       <button class="drawer-link member-only" data-panel="tips"><span class="di">💡</span>Tips</button>
       <button class="drawer-link member-only" data-panel="roadrules"><span class="di">🛑</span>Road Rules</button>
       <button class="drawer-link member-only" data-panel="schedule"><span class="di">🗓️</span>Schedule Repair</button>
-      <button class="drawer-link member-only danger" id="logoutBtn"><span class="di">⏻</span>Log out</button>
     </nav>
   </aside>
 
@@ -258,7 +266,7 @@
   <script src="js/branches.js?v=20260917g"></script>
   <script src="js/themes.js?v=20260827a"></script>
   <script src="js/store.js?v=20260827a"></script>
-  <script src="js/api.js?v=20261012a"></script>
-  <script src="js/app.js?v=20261012a"></script>
+  <script src="js/api.js?v=20261012c"></script>
+  <script src="js/app.js?v=20261012c"></script>
 </body>
 </html>

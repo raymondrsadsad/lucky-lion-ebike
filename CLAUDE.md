@@ -203,6 +203,27 @@ User can deploy Netlify only a few times but can run SQL freely → **build/veri
 - **Pending SQL:** run **`supabase/RUN-ALL-new-features.sql`** — a single combined file with all of it (variants+stock, pre-loved + its 1-of-1 unit columns `color/chassis_no/battery_no/motor_no/sold`, unit details+acquired date, messages). Re-running is safe (idempotent), so if you ran an earlier version just run it again for the new pre-loved columns. Individual files (`variants.sql`, `ebike-details.sql`, `preloved.sql`, `preloved-details.sql`, `unit-acquired.sql`, `messages.sql`) remain for reference. NOTE: adding a customer unit now always sends the new `user_ebikes` columns (incl. `acquired_at`), so `ebike-details.sql` **and** `unit-acquired.sql` must be run or unit-add fails.
 
 ## Recent changes log
+- 2026-10-12 (v2.0.1): **Live-review follow-ups (7 items).** After browser-reviewing v2.0.0: (1) **notif
+  panel text was invisible** — the bell dropdown is a child of the dark header (white text), so
+  `.notif-head`/`.notif-item` inherited white on white; added explicit `color:var(--ink)`. (2) **Admin
+  now edits everything** — `canEditBranch` returns true for admin (full access across branches in the
+  Users list); the Users "Admin — view only" chip → "✏️ Admin — full access" (`.ro-tag.ok` green). (3)
+  **Admin can reply in the Inbox** — `paintConversation` `readOnly` is now always false (was `isAdmin()`);
+  the inbox "Admin — monitor only" chip → "✏️ Admin — all branches". (4) **Customer ID hidden in the
+  staff Users list** — removed the `home-badge` member-id from `custRow` (still shown in registry/inbox
+  for disambiguation). (5) **Removed the coloured LEFT accent border** on the admin dashboard KPI tiles
+  (`.atile`: dropped `border-left-width:4px` + the per-tone `border-left-color`; kept the icon-disc
+  tints). (6) **Customer profile avatar menu (right header)** — new `#memberAvatarMenu` (member-only) with
+  a photo/initial avatar → dropdown **My Profile / Log out** (mirrors the staff avatar menu); Log out
+  moved out of the left drawer into this menu. `updateMemberAvatar()` renders it; reuses `avatar_url`
+  (already on `users`, verified live) + `API.uploadAvatar`. (7) **First-login onboarding** — after the
+  forced temp-password change, `refreshAuthUI` sets `JUST_ONBOARDED`, routes to `#account` and opens the
+  Profile panel, which shows a 👋 welcome banner and now has a **profile-photo uploader** + required
+  name/phone/address. New CSS: `.avatar>img`, `.prof-photo(-hint)`, `.ro-tag.ok`. **Verified in-browser**:
+  notif readable, tiles have no left border, avatar menu (My Profile/Log out), profile photo upload
+  round-trips to live Supabase (uploaded+saved+reset), onboarding banner shows. **No new SQL** (reuses
+  `avatar_url`). Cache-bust `20261012a`→**`20261012c`** (styles.css+app.js+api.js index;
+  styles.css+staff.js+api.js staff). `deploy/` synced + zip rebuilt. Git tag **v2.0.1**.
 - 2026-10-12: **Capstone panel revisions (18 items) + GitHub versioning.** Applied the panel's
   revisions without removing features. **NEW SQL (pending user run): `supabase/panel-revisions.sql`**
   — adds `users.must_change_password` (bool) + `repairs.branch` (text); idempotent, backfills
