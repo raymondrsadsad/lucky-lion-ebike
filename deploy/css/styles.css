@@ -252,19 +252,19 @@ body[data-theme] .polaroid { box-shadow: 0 0 0 3px var(--frame1, #fff), 0 0 0 6p
 .mtile.danger { color: var(--red); }
 .mtile-wide.danger:hover { background: var(--red); color: #fff; border-color: var(--red); }
 
-/* Staff / admin portal side-drawer → tile grid (group headers span the row) */
-#staffDrawer .drawer-nav { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: .45rem; padding: .6rem; align-content: start; }
-#staffDrawer .drawer-group { grid-column: 1 / -1; padding: .7rem .25rem .1rem; }
-#staffDrawer .drawer-link {
+/* Side-drawers (staff/admin portal + public site) → tile grid (group headers span the row) */
+#staffDrawer .drawer-nav, #publicDrawer .drawer-nav { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: .45rem; padding: .6rem; align-content: start; }
+#staffDrawer .drawer-group, #publicDrawer .drawer-group { grid-column: 1 / -1; padding: .7rem .25rem .1rem; }
+#staffDrawer .drawer-link, #publicDrawer .drawer-link {
   position: relative; flex-direction: column; align-items: center; justify-content: flex-start; gap: .28rem;
   text-align: center; padding: .72rem .3rem; border: 1px solid var(--line); border-left: 1px solid var(--line);
   border-radius: var(--r-sm); background: #fff; font-size: .73rem; font-weight: 600; line-height: 1.15; box-shadow: var(--shadow-sm);
 }
-#staffDrawer .drawer-link:hover { background: var(--mist); }
-#staffDrawer .drawer-link.is-active { border-color: var(--red); background: var(--red-soft); color: var(--red); }
-#staffDrawer .drawer-link .di { width: auto; font-size: 1.4rem; }
-#staffDrawer .drawer-link .di-badge,
-#staffDrawer .drawer-link .di-ext { position: absolute; top: 4px; right: 5px; margin: 0; }
+#staffDrawer .drawer-link:hover, #publicDrawer .drawer-link:hover { background: var(--mist); }
+#staffDrawer .drawer-link.is-active, #publicDrawer .drawer-link.is-active { border-color: var(--red); background: var(--red-soft); color: var(--red); }
+#staffDrawer .drawer-link .di, #publicDrawer .drawer-link .di { width: auto; font-size: 1.4rem; }
+#staffDrawer .drawer-link .di-badge, #publicDrawer .drawer-link .di-badge,
+#staffDrawer .drawer-link .di-ext, #publicDrawer .drawer-link .di-ext { position: absolute; top: 4px; right: 5px; margin: 0; }
 
 /* Desktop (>900px): the public account dropdown stays an anchored box, but wide enough for the
    tile grid and scrollable if the Browse + account tiles run tall. */
@@ -1521,3 +1521,12 @@ body.logged-in .guest-only { display: none; }
 .prof-photo { display: flex; align-items: center; gap: 1rem; margin: .4rem 0 1.2rem; }
 .prof-photo-hint { color: var(--muted); font-size: .78rem; margin: .4rem 0 0; }
 #memberAvatarMenu .dropdown { min-width: 180px; }
+
+/* guest Login / Create account in the right header */
+.hdr-auth { display: flex; gap: .5rem; align-items: center; }
+.hdr-auth .btn-ghost { color: #fff; border-color: rgba(255, 255, 255, .45); }
+.hdr-auth .btn-ghost:hover { background: rgba(255, 255, 255, .12); border-color: #fff; }
+@media (max-width: 560px) {
+  .site-header .socials { display: none; }   /* make room for the auth buttons (socials are in the footer too) */
+  .hdr-auth .btn { padding: .38rem .6rem; font-size: .8rem; }
+}

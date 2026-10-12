@@ -203,6 +203,16 @@ User can deploy Netlify only a few times but can run SQL freely → **build/veri
 - **Pending SQL:** run **`supabase/RUN-ALL-new-features.sql`** — a single combined file with all of it (variants+stock, pre-loved + its 1-of-1 unit columns `color/chassis_no/battery_no/motor_no/sold`, unit details+acquired date, messages). Re-running is safe (idempotent), so if you ran an earlier version just run it again for the new pre-loved columns. Individual files (`variants.sql`, `ebike-details.sql`, `preloved.sql`, `preloved-details.sql`, `unit-acquired.sql`, `messages.sql`) remain for reference. NOTE: adding a customer unit now always sends the new `user_ebikes` columns (incl. `acquired_at`), so `ebike-details.sql` **and** `unit-acquired.sql` must be run or unit-add fails.
 
 ## Recent changes log
+- 2026-10-13 (v2.0.2): **Public header/drawer polish (2 items).** Per owner: (1) **Login + Create
+  account moved to the RIGHT header** (guest-only `#hdrAuth` in `.nav-right` — Login = ghost, Create
+  account = primary; readable on the dark header, socials hide ≤560px to fit). Removed the drawer's
+  guest "Account" section (the `#loginBtn`/`#signupBtn` ids moved to the header, so `wireLogin`/
+  `wireSignup` are unchanged). (2) **Public left drawer now uses the icon-TILE grid** like the staff
+  portal — extended the `#staffDrawer .drawer-nav/.drawer-group/.drawer-link` tile rules to
+  `#publicDrawer` too (group headers span the row; each link is a centered icon tile). Browse + My
+  account render as 3-across tiles. Verified in-browser (guest): header buttons open the login/signup
+  modals, drawer is a grid, no console errors. **No SQL.** Cache-bust styles.css `20261012c`→
+  **`20261013a`** (both pages). `deploy/` synced + zip rebuilt. Git tag **v2.0.2**.
 - 2026-10-12 (v2.0.1): **Live-review follow-ups (7 items).** After browser-reviewing v2.0.0: (1) **notif
   panel text was invisible** — the bell dropdown is a child of the dark header (white text), so
   `.notif-head`/`.notif-item` inherited white on white; added explicit `color:var(--ink)`. (2) **Admin

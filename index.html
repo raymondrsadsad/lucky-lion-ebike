@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css?v=20261012c" />
+  <link rel="stylesheet" href="css/styles.css?v=20261013a" />
 </head>
 <body>
   <div id="themeDecor" aria-hidden="true"></div>
@@ -33,9 +33,13 @@
         <span class="brand-text" translate="no">LUCKY&nbsp;LION</span>
       </a>
 
-      <!-- top-right: socials + (member) notification bell + profile avatar menu -->
+      <!-- top-right: socials + (guest) Login/Create account + (member) bell + profile avatar -->
       <div class="nav-right">
         <div class="socials" id="hdrSocials"></div>
+        <div class="hdr-auth guest-only" id="hdrAuth">
+          <button class="btn btn-ghost btn-sm" id="loginBtn">Login</button>
+          <button class="btn btn-primary btn-sm" id="signupBtn">Create account</button>
+        </div>
         <div class="notif member-only" id="notifWrap">
           <button class="notif-btn" id="notifBell" aria-label="Notifications" aria-expanded="false">🔔<span class="notif-dot hidden" id="notifDot"></span></button>
           <div class="notif-panel hidden" id="notifPanel">
@@ -77,11 +81,6 @@
       <a class="drawer-link drawer-navlink" data-cat="2-wheels" href="#products"><span class="di">🏍️</span>2 Wheels</a>
       <a class="drawer-link drawer-navlink" href="#about"><span class="di">ℹ️</span>About</a>
       <a class="drawer-link drawer-navlink" href="#location"><span class="di">📍</span>Location</a>
-
-      <!-- shown when logged OUT -->
-      <div class="drawer-group guest-only">Account</div>
-      <button class="drawer-link guest-only" id="loginBtn"><span class="di">🔑</span>Login</button>
-      <button class="drawer-link guest-only" id="signupBtn"><span class="di">✨</span>Create account</button>
 
       <!-- shown when logged IN -->
       <div class="drawer-group member-only">My account</div>
