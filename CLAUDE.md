@@ -2,7 +2,7 @@
 
 > Purpose: this file is the single source of truth for how the project works, so a fresh
 > session can skip re-exploring the codebase. **Keep it updated on every change.**
-> Last updated: 2026-09-16.
+> Last updated: 2026-10-14.
 
 ## What it is
 Static marketing + member site for **Lucky Lion eBike (Trece Martires, Cavite)**. Capstone
@@ -203,6 +203,138 @@ User can deploy Netlify only a few times but can run SQL freely → **build/veri
 - **Pending SQL:** run **`supabase/RUN-ALL-new-features.sql`** — a single combined file with all of it (variants+stock, pre-loved + its 1-of-1 unit columns `color/chassis_no/battery_no/motor_no/sold`, unit details+acquired date, messages). Re-running is safe (idempotent), so if you ran an earlier version just run it again for the new pre-loved columns. Individual files (`variants.sql`, `ebike-details.sql`, `preloved.sql`, `preloved-details.sql`, `unit-acquired.sql`, `messages.sql`) remain for reference. NOTE: adding a customer unit now always sends the new `user_ebikes` columns (incl. `acquired_at`), so `ebike-details.sql` **and** `unit-acquired.sql` must be run or unit-add fails.
 
 ## Recent changes log
+- 2026-10-26 (c): **Removed the redundant single "Business hours" field from Site Settings.** It
+  duplicated the per-branch **🕘 Branch operating hours** editor (`branch_hours` JSON). Deleted the
+  `<label>Business hours <input name="hours"></label>` from `staff.html` and dropped `'hours'` from
+  **`SETTING_KEYS`** (`js/staff.js`) so it's no longer rendered or saved. Safe: `app.js` reads only
+  `branch_hours` (overrides `C.branches[k].hours`) + the `content.json` branch defaults — the global
+  `site_settings.hours` was never shown publicly (the stale DB value just goes unused). **No SQL.**
+  Verified in-browser (admin Settings): Email→Facebook→YouTube→TikTok→Address→Google Maps link, no
+  Business hours; Branch operating hours collapsible still present. staff.js PARSE OK. Cache-bust
+  **staff.js `20261026a`→`20261026b`**. `deploy/` synced + zip rebuilt. **PENDING:** drag the zip to
+  Netlify.
+- 2026-10-26 (b): **Calendar shows ALL slots per day + admin dashboard cleanup.** (1) **Every bookable
+  time slot is now listed in each calendar day cell** (`paintRepairCalendar`, `js/staff.js`) — booked
+  slots show the customer (start time + first name, colour by status), empty ones show "`08:00 · open`"
+  (muted). New module const **`REPAIR_SLOTS`** (shared by the calendar + New-repair, which now references
+  it); `slotRowsFor(reps, iso)` maps the 4 fixed slots to booked/open, appending any non-standard-slot
+  repairs. `.rcal-cell` min-height 96→118px; new `.rcal-ev-open` muted style. Phones still collapse to a
+  count dot. (2) **Admin dashboard (`renderAdminDashboard`) decluttered per owner:** removed "·
+  read-only oversight" from the hero eyebrow (just "Owner / Admin"); removed the red top-accent bar
+  (dropped `.admin-hero::before`); **removed the distracting red overdue/unread alert banner** — the
+  overdue count now shows as a red "`N overdue`" sub-line on the **Pending repairs** tile (which turns
+  red tone when overdue), new `.atile-flag` CSS. **No SQL.** Verified in-browser (admin): all 4 slots
+  per day with Oct 9 10:00 booked red, dashboard hero clean (no eyebrow suffix, no red bar), pending
+  tile shows "4 overdue", no banner. staff.js PARSE OK; braces 1152/1152. Cache-bust `20261019d`→
+  **`20261026a`** (both pages; carried from (a) same day). `deploy/` synced + zip rebuilt. **PENDING:**
+  drag the zip to Netlify.
+- 2026-10-26: **Calendar day cells now show concise per-day info (not just a count).** The month-grid
+  cells (`paintRepairCalendar`, `js/staff.js`) were big and empty; each day now renders up to **2 event
+  chips** = repair **start time + customer first name**, colour-coded by status (`evChip`): pending =
+  blue, in-progress = amber, overdue = red, done = green; a **"+N more"** line when a day has >2. Cells
+  changed from square (`aspect-ratio:1`) to a **96px min-height column** so chips fit; overdue days get
+  a soft red tint; today is ringed; selected day = accent border + soft bg (was a solid fill). On
+  **phones (≤640px)** the chips hide and a **count dot** shows instead (7 columns are too narrow for
+  text) — both the chips and the dot are rendered, CSS toggles which. New CSS `.rcal-ev*`/`.rcal-evs`/
+  `.rcal-more`; `.rcal-count` now hidden on desktop. **No SQL.** Verified in-browser (admin): Oct 9
+  shows a red "⏰ 10:00 Mark" chip, today ringed, day drill-down still works. staff.js PARSE OK; braces
+  1151/1151. Cache-bust **staff.js + styles.css `20261019d`→`20261026a`** (both pages). `deploy/` synced
+  + zip rebuilt. **PENDING:** drag the zip to Netlify.
+- 2026-10-19 (e): **Staff/Admin Scheduled Repairs — searchable customer picker + a month CALENDAR view.**
+  Two asks: (1) **New-repair Customer dropdown → a search-as-you-type combobox** (`openNewRepair`,
+  `js/staff.js`). The native `<select>` listing every customer is replaced with a hidden `#nrCustomer`
+  (holds the chosen id for FormData) + a text `#nrCustSearch` + a filtered `#nrCustList` that shows at
+  most **8** matches (filters on name/username/branch) with a "+N more — keep typing…" hint, so a
+  branch with many customers isn't dumped at once. Selecting one fills the field + auto-populates the
+  e-bike `<select>` (logic moved to `fillModels()`; blur closes the list after 150ms). New CSS
+  `.combo*`. (2) **Calendar view on the repairs page** — a new **📋 List / 📅 Calendar** toggle in the
+  `.rep-toolbar` (`REP_VIEW` state). Calendar mode (`paintRepairCalendar`, dispatched from
+  `paintRepairRows`) draws a month grid of the branch's non-cancelled repairs: each day shows a count
+  badge, days with open past-due repairs are **red**, today is ringed, and **tapping a day lists that
+  day's repairs** below (reuses `scheduledRow`/`doneRow` + `wireRepairRows`); ‹ › navigate months
+  (`REP_CAL_MONTH`/`REP_CAL_DAY`). The Scheduled/History seg + history controls hide in calendar mode.
+  New CSS `.view-toggle`/`.vt-btn`/`.rcal-*`. **No SQL.** Verified in-browser (admin): search narrows +
+  selects + fills e-bike; calendar shows Oct with Oct 9 overdue-red "1", day drill-down works, month
+  nav works. staff.js PARSE OK; braces 1144/1144. Cache-bust **staff.js + styles.css `20261019c`→
+  `20261019d`** (both pages). `deploy/` synced + zip rebuilt. **PENDING:** drag the zip to Netlify.
+- 2026-10-19 (d): **Dashboard "Next repairs" rows align when a customer has no phone.** The row
+  (`repairLine` in `renderDashboard`, `js/staff.js`) only rendered the `.rl-call` phone button when
+  `u.phone` existed; without it the flexing `.rl-main` grew and shoved the date/time + OVERDUE pill
+  right, so a phone-less customer's row (e.g. Mark Dave) was misaligned with the others. Now a no-phone
+  row renders an **empty same-width placeholder** `<span class="rl-call rl-call-ph">` so the date +
+  status columns stay put. New CSS `.rl-call-ph { background: transparent; pointer-events: none; }`.
+  **No SQL.** Verified in-browser (all four Next-repairs rows' dates/OVERDUE pills now aligned).
+  Cache-bust **staff.js `20261019a`→`20261019c`** + styles.css already `20261019c` (edited again,
+  same version). `deploy/` synced + zip rebuilt. **PENDING:** drag the zip to Netlify.
+- 2026-10-19 (c): **Recolour part 2 — primary buttons + menu now blue too (owner: "still too much red").**
+  Follow-up to (b): the owner still found the big red elements (Create account, Save changes, Update
+  password, the hamburger menu, the red avatar discs) too error-like, so **`.btn-primary` was moved
+  from red to the blue accent** (bg + hover `--accent-dark` + blue shadow) — this flips EVERY primary
+  CTA site-wide (Create account, Book repair, Save changes, Update password, New repair, Mark
+  in-progress/done, Send, drawer Close, etc.). Also flipped to blue: **`.hamburger`** (the menu button,
+  both pages), **`.drawer-close`**, **`.bubble.mine`** (sent chat bubbles — now standard blue),
+  **`.cal-day.is-sel`** + **`.cal-key-sel`** (selected calendar day), and **`.avatar-ph`** (initial-letter
+  avatar discs) red→`--ink` (so the dashboard hero + header avatar are dark, not red). **Red still KEPT**
+  for: brand wordmark/logo, `.btn-danger` + all delete/remove/cancel controls, and ALERTS/counts
+  (OVERDUE pills, `.rep-line.is-late .rl-ava` overdue avatars, `.tile-note`/`.di-badge`/`.thread-badge`/
+  `.menu-badge`/`.notif-dot` count badges, SALE/NEW badges, `.cal-key-full` fully-booked). Net palette:
+  **blue = all actions + selection + focus · green = positive confirm (dialogs) · red = brand + alerts +
+  destructive.** Required-field `*` asterisks stay red (standard convention). **CSS only — no JS/markup/
+  SQL.** Verified in-browser (public: blue menu + Create account header/form + Login outline, red
+  wordmark; staff dashboard: blue menu, dark avatars, blue Open-repairs/See-all, red Overdue tile/pills).
+  Braces 1115/1115. Cache-bust **styles.css `20261019b`→`20261019c`** (both pages). `deploy/` synced +
+  zip rebuilt. **PENDING:** drag the zip to Netlify.
+- 2026-10-19 (b): **System recolour — blue (logo) for interactions, red reserved for brand/CTA/alerts.**
+  Per owner: "too much red, it reads like an error everywhere." Introduced **logo blue as the everyday
+  interaction colour** and kept red only where it should grab attention. New `:root` tokens in
+  `css/styles.css`: **`--accent #2e6be6`** (logo blue), `--accent-dark #1d52c4`, `--accent-soft #eef3fe`;
+  **`--ring`** changed to the blue rgba (so EVERY focus ring is blue). **41 interaction states repointed
+  red→accent** (by line, via a one-pass script): `.btn-ghost` (+hover) — the main offender, used for
+  Edit/Message/Add/Save-sm everywhere; nav underline; dropdown/drawer-navlink hovers; menu tiles;
+  drawer-link.is-active; gallery-thumb/colour-swatch `.active`; all `:focus` borders (form inputs,
+  search, chat, poster colour fields); seg-tab active count; reorder arrows; crop-ratio + wheel-tab
+  tabs; view-back; dashboard tiles/quick-actions/mini-list; account tiles; chips; inbox thread hover +
+  `.is-active`; branch cards; calendar open-day; notif-item; socials; contact links; fab menu.
+  `.modal-close:hover` → neutral grey (was red). **Red deliberately KEPT** for: the brand wordmark/logo,
+  `.btn-primary` (primary CTAs), SALE/NEW badges, prices, section-title underline, the OVERDUE/alert
+  pills + count badges, and ALL destructive states (`.btn-danger`, `.btn-ghost.danger`, delete-X
+  `.unit-x`/`.photo .del`/`.cc-del-num`/`.pc-del`, logout `.mtile-wide.danger`). Pairs with the
+  2026-10-19 (a) confirm-button change (green=safe/red=destructive), so the palette now reads: **red =
+  brand + important + stop; blue = everyday/go; green = positive confirm.** **CSS only — no JS, no SQL,
+  no markup.** Verified in-browser (staff repairs: ghost buttons + active tab now blue, Mark/New still
+  red, OVERDUE red; drawer active tile blue; public: Login blue-outline, Create account red, wordmark
+  red). Braces balanced (1115/1115). Cache-bust **styles.css `20261019a`→`20261019b`** (both pages;
+  staff.js/app.js unchanged, stay `20261019a`). `deploy/` synced (mirror verified) + zip rebuilt.
+  **PENDING:** drag the zip to Netlify.
+- 2026-10-19: **Confirmation dialog buttons recoloured — green = safe, red = destructive.** Per owner
+  (red should read as "error/stop", green as "good/go"): the shared **`confirmAction()`** dialog (in
+  BOTH `js/staff.js` ~L55 and `js/app.js` ~L82) now sets the confirm button's class explicitly —
+  `yes.className = 'btn ' + (danger ? 'btn-danger' : 'btn-success')` — instead of the old
+  `classList.toggle('btn-danger', danger)` on a permanently-red `btn-primary` base (so a non-danger
+  confirm used to be red too). New **`.btn-success`** (green `#16a34a`/hover `#15803d`) in
+  `css/styles.css` next to `.btn-danger` (which also gained the matching shadow/hover lift). The
+  Cancel/No button stays a neutral ghost. **No call sites needed changing** — every delete/remove/
+  cancel already passed `danger:true` (→ red) and all add/adjust/save/create/book/update-status/re-open
+  confirms default to green. Verified in-browser (staff): "Mark in-progress" = green, "Cancel repair" =
+  red. **No SQL.** Cache-bust `20261014a`→**`20261019a`** (styles.css both pages; staff.js;
+  **app.js** index — it had been stale at `20261012c`). `deploy/` synced (mirror verified) +
+  `lucky-lion-site.zip` rebuilt. **PENDING:** drag the zip to Netlify.
+- 2026-10-14: **Inbox: hide member ID + customer "View details" popup (staff/admin).** Per owner,
+  on the **💬 Inbox**: (1) **removed the member ID** from each thread row in the left list
+  (`paintInboxThreads`, `js/staff.js`) — the `thread-id` span is gone (the `memberId` field is still
+  on `INBOX_THREADS` but no longer rendered; IDs still show in the registry + the new detail popup).
+  (2) **New "👤 View details" button** in the open-conversation header (`paintConversation`,
+  `#convDetails`) → **`openCustomerDetail(userId)`** (new, near `refreshConversation`): opens the
+  shared **`#panelModal`** and loads the customer's **profile + contact** (phone tap-to-call, email,
+  address → Google-Maps link, with "no file" states), their **🛵 E-Bikes** (reuses `unitRow(e,false)`
+  read-only, so colour + chassis/battery/motor serials + acquired date + sale note show), and their
+  **🛠️ Repairs** (full history, newest first: model · service · date · slot · status pill · charge ·
+  notes). Data via `API.getUsers`/`getUserEbikes`/`getRepairsByUser`. New CSS `.cd-contact`/`.cd-sec`/
+  `.cd-sec-h`/`.cd-rep` in `styles.css`. **No SQL.** Cache-bust `20261013a`→**`20261014a`**
+  (styles.css both pages; staff.js). `deploy/` synced (mirror verified) + `lucky-lion-site.zip`
+  rebuilt (index.html at root). **Verified in-browser** (staff login): IDs gone from thread list,
+  View-details popup shows profile/e-bikes/repairs, closes cleanly. **PENDING:** drag the zip to
+  Netlify.
 - 2026-10-13 (v2.0.2): **Public header/drawer polish (2 items).** Per owner: (1) **Login + Create
   account moved to the RIGHT header** (guest-only `#hdrAuth` in `.nav-right` — Login = ghost, Create
   account = primary; readable on the dark header, socials hide ≤560px to fit). Removed the drawer's
@@ -812,3 +944,33 @@ User can deploy Netlify only a few times but can run SQL freely → **build/veri
 - 2026-07-04: Scheduled Repairs toggle + full upgrade (type/cost/completed_at, overdue, edit/cancel/reopen, history search+totals).
 - 2026-07-04: Fixed mobile sale ribbon clipped by sticky header (moved `#themeRibbon` above `<header>` in `index.html`).
 - 2026-07-04: Multiple photos per model — staff upload/manage (edit + add-new-model form), **drag-to-reorder** (pointer-based, mouse+touch) + ↑↓, customer gallery prev/next + counter + thumb strip.
+- 2026-11-08: **Maintenance modal content replaced with the NWOW troubleshooting manual.** Per owner,
+  the customer **General Maintenance** modal (`panelMaintenance()` in `js/app.js`, opened from the
+  member 🧰 Maintenance action) now shows the **10 troubleshooting articles copied from the NWOW site**
+  (`/Users/raymondsadsad/nwow` → `CONTENT.maintenance`) instead of the old Basic/Detailed category
+  lists. `data/content.json` → `maintenance` is now `{heading, intro, articles:[{id,title,html}]}`;
+  `panelMaintenance()` rewritten to render the articles as a `<details>` accordion (title summary +
+  raw HTML body in `.article-maint`), with the old basic/detailed renderer kept as a legacy fallback.
+  The 20 referenced photos were copied into **`assets/maintenance/`** and the article HTML image paths
+  rewritten `../assets/` → `assets/` (index.html is at root). New CSS `.mnt-articles`/`.mnt-article`/
+  `.article-maint img{max-width:100%}` in `styles.css`. Article text is verbatim from NWOW (still says
+  "NWOW" in a couple of titles/bodies — left as-is per the copy request). **No SQL.** Cache-bust
+  `20261026a`/`20261019a` → **`20261108a`** (styles.css both pages; app.js index). `deploy/` synced
+  (app.js, styles.css, content.json, assets/maintenance/*, both HTML) + `lucky-lion-site.zip` rebuilt.
+  Verified over the local no-cache server (:8000): content.json serves 10 articles, app.js serves the
+  new renderer, maintenance images return 200. Edits applied in-place (not a worktree) since the live
+  :8000 server serves this checkout. **PENDING:** drag the zip to Netlify. Not committed to git.
+- 2026-11-08 (b): **Maintenance manual cleanup (de-NWOW + fixes), localhost review.** Follow-up to
+  the 2026-11-08 import. In `data/content.json` → `maintenance.articles` (scoped to the articles only;
+  other sections untouched): (1) **brakes-tires** — removed the embedded NWOW YouTube `<iframe>`;
+  (2) **adjust-seat-erv** — "seat of ERV" → "seat of **Ebike**" (title + body heading);
+  (3) **disc-brake-loose** — title "(ERVS2, ERVS, TK AND CS)" → "**(models with disc brakes)**"
+  (owner chose generic wording; LL has 14 disc-brake models, too many to list);
+  (4) **footbrake-erv** — title "(ERV)" → "(foot-brake units)"; (5) **NWOW → Lucky Lion** brand swap
+  across all article titles/bodies (stops-suddenly, brakes-tires, remote-function incl. its title).
+  Also **edited the photo** `assets/maintenance/charger-blink-0.jpg` with Pillow: covered the baked-in
+  cursive "NWOW" dashboard wordmark and overlaid "Lucky Lion" in Snell Roundhand script (per-row
+  gradient-matched fill, verified by re-reading the output). `deploy/` synced (content.json + image)
+  + `lucky-lion-site.zip` rebuilt. **No JS/CSS change → no cache-bust bump** (no-cache dev server
+  reloads JSON/image on refresh; after a real Netlify deploy, hard-refresh since content.json/images
+  aren't versioned). Edits in-place (not a worktree). **PENDING:** drag the zip to Netlify. Not committed.

@@ -78,7 +78,8 @@ function confirmAction(message, opts = {}) {
     host.querySelector('#confirmMsg').textContent = message;
     const yes = host.querySelector('#confirmYes'), no = host.querySelector('#confirmNo');
     yes.textContent = confirmLabel; no.textContent = cancelLabel;
-    yes.classList.toggle('btn-danger', !!danger);
+    // green = safe/positive confirm (save/create/book); red = destructive (delete/cancel)
+    yes.className = 'btn ' + (danger ? 'btn-danger' : 'btn-success');
     host.classList.remove('hidden'); document.body.style.overflow = 'hidden';
     const done = (val) => {
       host.classList.add('hidden'); document.body.style.overflow = '';
@@ -1378,13 +1379,26 @@ function panelPlaceholder(title, msg) {
 function panelMaintenance() {
   const mnt = C.maintenance;
   if (!mnt) return panelPlaceholder('Maintenance', 'General maintenance guides will be posted here.');
+  const arts = mnt.articles || [];
+  if (arts.length) {
+    // Troubleshooting articles (title + rich HTML body with photos) shown as an accordion.
+    // Article HTML is bundled project content (data/content.json), rendered as markup like the source site.
+    const articleBlock = (a) => `
+      <details class="mnt-article">
+        <summary><span class="mnt-art-ico">🔧</span><span class="mnt-art-title">${esc(a.title)}</span></summary>
+        <div class="article-maint">${a.html || esc(a.body || '')}</div>
+      </details>`;
+    return `<h3 class="panel-title">${esc(mnt.heading)}</h3>
+      <p class="panel-sub">${esc(mnt.intro)}</p>
+      <div class="mnt-articles">${arts.map(articleBlock).join('')}</div>
+      ${mnt.source ? `<p class="mnt-source">ℹ️ ${esc(mnt.source)}</p>` : ''}`;
+  }
+  // Legacy fallback: Basic/Detailed category lists from an older content.json.
   const catBlock = (cat) => `
     <div class="tip-cat">
       <h4>${esc(cat.category)}</h4>
       <ul>${cat.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
     </div>`;
-  // #19: split into Basic (simple checks when there's a problem) + Detailed (thorough checks & steps).
-  // Falls back to the legacy flat `categories` list if an older content.json is in use.
   const basic = mnt.basic || [];
   const detailed = mnt.detailed || [];
   const legacy = (!basic.length && !detailed.length) ? (mnt.categories || []) : [];

@@ -51,7 +51,8 @@ function confirmAction(message, opts = {}) {
     host.querySelector('#confirmMsg').textContent = message;
     const yes = host.querySelector('#confirmYes'), no = host.querySelector('#confirmNo');
     yes.textContent = confirmLabel; no.textContent = cancelLabel;
-    yes.classList.toggle('btn-danger', !!danger);
+    // green = safe/positive confirm (add/adjust/save/create); red = destructive (delete/cancel)
+    yes.className = 'btn ' + (danger ? 'btn-danger' : 'btn-success');
     host.classList.remove('hidden'); document.body.style.overflow = 'hidden';
     const done = (val) => { host.classList.add('hidden'); document.body.style.overflow = ''; yes.onclick = no.onclick = host.onclick = null; resolve(val); };
     yes.onclick = () => done(true);
@@ -444,7 +445,9 @@ function renderDashboard() {
         <span class="rl-sub">${esc(r.timeSlot || '—')}</span>
       </div>
       <span class="rep-pill rep-${esc(late ? 'overdue-pill' : r.status)}">${esc(late ? 'overdue' : r.status)}</span>
-      ${u && u.phone ? `<a class="rl-call" href="tel:${esc(u.phone)}" title="Call ${esc(name)}">📞</a>` : ''}
+      ${u && u.phone
+      ? `<a class="rl-call" href="tel:${esc(u.phone)}" title="Call ${esc(name)}">📞</a>`
+      : `<span class="rl-call rl-call-ph" aria-hidden="true"></span>`}
     </div>`;
   };
 
@@ -600,6 +603,7 @@ async function renderAdminDashboard() {
   const doneAll = REPAIRS.filter(r => r.status === 'done');
   const cancelledAll = REPAIRS.filter(r => r.status === 'cancelled');
   const unreadAll = Object.values(unreadByBranch).reduce((a, b) => a + b, 0);
+  const overdueAll = active.filter(r => r.date && r.date < t10).length;
 
   const badge = $('#navRepairCount');
   if (badge) { badge.textContent = active.length; badge.classList.toggle('hidden', !active.length); }
@@ -641,7 +645,7 @@ async function renderAdminDashboard() {
     <div class="dash-hero admin-hero">
       ${avatarImg(ME || {}, 'avatar-xl')}
       <div class="dh-txt">
-        <span class="admin-eyebrow">Owner / Admin · read-only oversight</span>
+        <span class="admin-eyebrow">Owner / Admin</span>
         <strong>${greetWord(now.getHours())}, ${esc(ME ? (ME.name || ME.username) : 'admin')}</strong>
         <span>${esc(dayName(now))}</span>
       </div>
@@ -655,20 +659,10 @@ async function renderAdminDashboard() {
 
     <div class="admin-tiles">
       ${tile('📅', repairsTodayAll.length, 'Repairs today', `${repairsTodayAll.filter(r => r.status === 'done').length} done`, 'blue')}
-      ${tile('🛠️', active.length, 'Pending repairs', 'awaiting or in progress', 'amber')}
+      ${tile('🛠️', active.length, 'Pending repairs', overdueAll ? `<span class="atile-flag">${overdueAll} overdue</span>` : 'awaiting or in progress', overdueAll ? 'red' : 'amber')}
       ${tile('✅', doneAll.length, 'Completed', `${cancelledAll.length} cancelled`, 'green')}
       ${tile('💬', unreadAll, 'Unread messages', unreadAll ? 'needs a reply' : 'all caught up', unreadAll ? 'red' : 'ink')}
     </div>
-
-    ${(() => { const overdueAll = active.filter(r => r.date && r.date < t10).length; return (overdueAll || unreadAll) ? `
-      <div class="dash-alert${overdueAll ? ' is-bad' : ''}">
-        <span class="da-icon">${overdueAll ? '⏰' : '🔔'}</span>
-        <div class="da-txt">
-          <strong>${[overdueAll ? `${overdueAll} overdue repair${overdueAll === 1 ? '' : 's'}` : '', unreadAll ? `${unreadAll} unread message${unreadAll === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')}</strong>
-          <span>Open Analytics for the full per-branch picture.</span>
-        </div>
-        <button class="btn btn-primary btn-sm" data-go="analytics">Open Analytics</button>
-      </div>` : ''; })()}
 
     <div class="dash-card">
       <div class="dc-head"><h3>Per-branch summary</h3><button class="btn btn-ghost btn-sm" data-go="analytics">📈 Full analytics →</button></div>
@@ -1874,7 +1868,7 @@ function paintInboxThreads() {
     <button class="thread${r.unread ? ' has-unread' : ''}${r.uid === INBOX_OPEN ? ' is-active' : ''}" data-user="${esc(r.uid)}">
       <span class="thread-av">${esc((r.name || '?').trim().charAt(0).toUpperCase())}</span>
       <span class="thread-main">
-        <span class="thread-top"><strong>${esc(r.name)}${r.memberId ? ` <span class="thread-id">${esc(r.memberId)}</span>` : ''}${isAdmin() && r.branch ? ` <span class="branch-tag" translate="no">📍 ${esc(branchShort(r.branch))}</span>` : ''}${r.noBranch ? ` <span class="branch-tag warn">⚠ no branch</span>` : ''}</strong><span class="thread-time">${esc(shortTime(r.last.createdAt))}</span></span>
+        <span class="thread-top"><strong>${esc(r.name)}${isAdmin() && r.branch ? ` <span class="branch-tag" translate="no">📍 ${esc(branchShort(r.branch))}</span>` : ''}${r.noBranch ? ` <span class="branch-tag warn">⚠ no branch</span>` : ''}</strong><span class="thread-time">${esc(shortTime(r.last.createdAt))}</span></span>
         <span class="thread-prev">${r.last.sender === 'staff' ? 'You: ' : ''}${esc(r.last.body)}</span>
       </span>
       ${r.unread ? `<span class="thread-badge">${r.unread}</span>` : ''}
@@ -1904,6 +1898,7 @@ async function paintConversation() {
       <div class="conv-head">
         <button class="btn btn-ghost btn-sm conv-back" id="convBack" title="Back to inbox">←</button>
         <strong class="conv-name">${esc(name)}${readOnly && u && u.branch ? ` <span class="branch-tag" translate="no">📍 ${esc(branchShort(u.branch))}</span>` : ''}</strong>
+        <button class="btn btn-ghost btn-sm" id="convDetails" type="button">👤 View details</button>
         ${u && u.phone ? `<a class="btn btn-ghost btn-sm" href="tel:${esc(u.phone)}">📞 Call</a>` : ''}
       </div>
       <div class="chat-list" id="convList"></div>
@@ -1923,6 +1918,7 @@ async function paintConversation() {
     const wrap = $('#inboxWrap'); if (wrap) wrap.classList.remove('has-open');
     paintInboxThreads(); paintConversation();
   });
+  const det = $('#convDetails'); if (det) det.addEventListener('click', () => openCustomerDetail(userId));
   if (!readOnly) $('#convForm').addEventListener('submit', async e => {
     e.preventDefault();
     const inp = $('#convInput'), body = inp.value.trim();
@@ -1950,8 +1946,50 @@ async function refreshConversation(userId) {
   if (!isAdmin()) { try { await API.markMessagesRead(userId, 'customer'); updateInboxBadgeCount(); } catch { } }
 }
 
+// Customer detail popup — opened from the inbox (and reusable elsewhere):
+// profile + contact, the e-bikes they own, and their full repair history.
+async function openCustomerDetail(userId) {
+  const body = $('#panelBody'); if (!body) return;
+  $('#panelModal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  body.innerHTML = `<h3 class="panel-title">Customer details</h3><p class="panel-sub">Loading…</p>`;
+  let u = null, units = [], reps = [];
+  try { u = (await API.getUsers()).find(x => x.id === userId); } catch { }
+  try { units = await API.getUserEbikes(userId); } catch { }
+  try { reps = await API.getRepairsByUser(userId); } catch { }
+  if (!u) { body.innerHTML = `<h3 class="panel-title">Customer details</h3><p class="panel-sub">Couldn't load this customer.</p>`; return; }
+  const maps = a => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a)}`;
+  const repLine = r => {
+    const m = STORE.modelById(r.modelId);
+    const when = r.status === 'done' && r.completedAt
+      ? new Date(r.completedAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+      : (r.date || '—');
+    return `<div class="cd-rep">
+      <div><strong>${esc(m ? m.name : r.modelId)}</strong>${r.repairType ? ` · ${esc(r.repairType)}` : ''}</div>
+      <div class="b-meta">📅 ${esc(when)}${r.timeSlot ? ` · ⏰ ${esc(r.timeSlot)}` : ''} · <span class="rep-pill rep-${esc(r.status)}">${esc(r.status)}</span>${r.cost != null && r.cost !== '' ? ` · 💵 ${peso(r.cost)}` : ''}</div>
+      ${r.notes ? `<div class="b-meta">📝 ${esc(r.notes)}</div>` : ''}
+    </div>`;
+  };
+  const repSorted = reps.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  body.innerHTML = `
+    <h3 class="panel-title">${esc(u.name || u.username)}</h3>
+    <p class="panel-sub">${u.memberId ? esc(u.memberId) + ' · ' : ''}@${esc(u.username)}${u.branch ? ' · ' + esc(branchName(u.branch)) : ''}</p>
+    <div class="cd-contact">
+      ${u.phone ? `<div class="b-meta"><a href="tel:${esc(u.phone)}">📞 ${esc(u.phone)}</a></div>` : '<div class="b-meta b-meta-missing">📞 No phone on file</div>'}
+      ${u.email ? `<div class="b-meta">✉️ ${esc(u.email)}</div>` : ''}
+      ${u.address ? `<div class="b-meta">📍 <a href="${esc(maps(u.address))}" target="_blank" rel="noopener">${esc(u.address)}</a></div>` : '<div class="b-meta b-meta-missing">📍 No address on file</div>'}
+    </div>
+    <div class="cd-sec">
+      <div class="cd-sec-h">🛵 E-Bikes (${units.length})</div>
+      ${units.map(e => unitRow(e, false)).join('') || '<div class="b-meta" style="color:var(--muted)">No units on file.</div>'}
+    </div>
+    <div class="cd-sec">
+      <div class="cd-sec-h">🛠️ Repairs (${reps.length})</div>
+      ${repSorted.map(repLine).join('') || '<div class="b-meta" style="color:var(--muted)">No repairs yet.</div>'}
+    </div>`;
+}
+
 /* ================= SITE SETTINGS ================= */
-const SETTING_KEYS = ['email', 'facebook', 'youtube', 'tiktok', 'address', 'hours', 'maps'];
+const SETTING_KEYS = ['email', 'facebook', 'youtube', 'tiktok', 'address', 'maps'];   // 'hours' removed — per-branch "Branch operating hours" replaces it
 // per-branch phone numbers, stored as JSON in site_settings.branch_phones ({branchKey: phone})
 const branchInfo = (key) => ((STORE.content && STORE.content.branches) || {})[key] || {};
 const branchPhonesMap = () => { try { return JSON.parse(SETTINGS.branch_phones || '{}') || {}; } catch { return {}; } };
@@ -2288,7 +2326,9 @@ async function refreshUnits(userId) {
 
 /* ---- scheduled repairs (tabbed: active work vs completed history) ---- */
 let REPAIRS = [], REP_USERS = {}, REP_TAB = 'scheduled', REP_QUERY = '', REP_BRANCH = null, REP_HIST_SORT = 'newest';
+let REP_VIEW = 'list', REP_CAL_MONTH = null, REP_CAL_DAY = null;   // list vs month-calendar view
 const REPAIR_TYPES = ['Battery', 'Brakes', 'Tire / Wheel', 'Motor', 'Electrical / Wiring', 'Controller', 'Tune-up / General', 'Other'];
+const REPAIR_SLOTS = ['08:00–10:00', '10:00–12:00', '13:00–15:00', '15:00–17:00'];   // the bookable time slots (shared by the calendar + New-repair)
 const repNameOf = id => { const u = REP_USERS[id]; return u ? (u.name || u.username) : id; };
 const today10 = () => new Date().toISOString().slice(0, 10);
 const peso = n => '₱' + Number(n).toLocaleString('en-PH');
@@ -2317,13 +2357,20 @@ function paintRepairs() {
   const branchBar = isAdmin()
     ? `<div class="branch-bar"><label>Branch <select id="repBranchSel">${branchOptionsHtml(REP_BRANCH === 'all' ? '' : REP_BRANCH, { all: true, allLabel: 'All branches' })}</select></label><span class="ro-tag">👁 Admin — all branches</span></div>`
     : `<div class="branch-bar"><span class="b-meta">Showing <strong>${nt(branchName(myBranch()))}</strong> repairs.</span></div>`;
+  const cal = REP_VIEW === 'calendar';
   $('#repairsList').innerHTML = branchBar + `
-    <div class="rep-toolbar"><button type="button" class="btn btn-primary" id="repNewBtn">➕ New repair</button></div>
-    <div class="seg" role="tablist">
+    <div class="rep-toolbar">
+      <button type="button" class="btn btn-primary" id="repNewBtn">➕ New repair</button>
+      <div class="view-toggle" role="tablist">
+        <button type="button" class="vt-btn ${cal ? '' : 'is-active'}" data-view="list">📋 List</button>
+        <button type="button" class="vt-btn ${cal ? 'is-active' : ''}" data-view="calendar">📅 Calendar</button>
+      </div>
+    </div>
+    ${cal ? '' : `<div class="seg" role="tablist">
       <button class="seg-btn ${REP_TAB === 'scheduled' ? 'is-active' : ''}" data-tab="scheduled" role="tab">Scheduled <span class="seg-count">${scheduled}</span></button>
       <button class="seg-btn ${REP_TAB === 'done' ? 'is-active' : ''}" data-tab="done" role="tab">History <span class="seg-count">${done}</span></button>
-    </div>
-    ${REP_TAB === 'done' ? `<div class="hist-controls">
+    </div>`}
+    ${!cal && REP_TAB === 'done' ? `<div class="hist-controls">
       <input class="user-search" id="repSearch" type="search" autocomplete="off" aria-label="Search repair history" placeholder="Search history by customer, model, or service…" value="${esc(REP_QUERY)}" />
       <label class="hist-sort">Sort <select id="repHistSort">
         <option value="newest"${REP_HIST_SORT === 'newest' ? ' selected' : ''}>Completed: newest</option>
@@ -2334,6 +2381,7 @@ function paintRepairs() {
   const bs = $('#repBranchSel');
   if (bs) bs.addEventListener('change', e => { REP_BRANCH = e.target.value || 'all'; paintRepairs(); });
   const nb = $('#repNewBtn'); if (nb) nb.addEventListener('click', openNewRepair);
+  $$('#repairsList .vt-btn').forEach(b => b.addEventListener('click', () => { REP_VIEW = b.dataset.view; paintRepairs(); }));
   $$('#repairsList .seg-btn').forEach(b => b.addEventListener('click', () => { REP_TAB = b.dataset.tab; paintRepairs(); }));
   const s = $('#repSearch');
   if (s) s.addEventListener('input', e => { REP_QUERY = e.target.value; paintRepairRows(); });
@@ -2430,6 +2478,7 @@ function doneRow(r) {
 function paintRepairRows() {
   const host = $('#repRows');
   if (!host) return;
+  if (REP_VIEW === 'calendar') { paintRepairCalendar(host); return; }
   const scoped = repairsInScope();
   if (REP_TAB === 'scheduled') {
     const list = scoped.filter(r => r.status !== 'done' && r.status !== 'cancelled').sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -2451,6 +2500,74 @@ function paintRepairRows() {
       (list.map(doneRow).join('') || '<p class="empty-note">No completed repairs yet.</p>');
   }
   wireRepairRows();
+}
+
+// month-grid calendar of the branch's repairs (dates with a count; tap a day to see that day's repairs)
+function paintRepairCalendar(host) {
+  if (!REP_CAL_MONTH) { const n = new Date(); REP_CAL_MONTH = new Date(n.getFullYear(), n.getMonth(), 1); }
+  const scoped = repairsInScope().filter(r => r.status !== 'cancelled' && r.date);
+  const byDate = {};
+  scoped.forEach(r => (byDate[r.date] ??= []).push(r));
+  const y = REP_CAL_MONTH.getFullYear(), mo = REP_CAL_MONTH.getMonth();
+  const first = new Date(y, mo, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(y, mo + 1, 0).getDate();
+  const monthName = first.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+  const todayIso = today10();
+  const dows = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(x => `<div class="rcal-dow">${x}</div>`).join('');
+  const slotStart = s => (s || '').split('–')[0].trim();                 // "08:00–10:00" → "08:00"
+  const firstName = id => { const n = (repNameOf(id) || '').trim(); return n.split(/\s+/)[0] || n; };
+  // show EVERY bookable slot for a day — booked slots show the customer, empty ones show "open"
+  const slotRowsFor = (reps, iso) => {
+    const used = new Set();
+    const rows = REPAIR_SLOTS.map(slot => {
+      const r = reps.find(x => (x.timeSlot || '') === slot && !used.has(x.id));
+      if (!r) return `<span class="rcal-ev rcal-ev-open">${esc(slotStart(slot))} · open</span>`;
+      used.add(r.id);
+      const st = r.status === 'done' ? 'done' : (iso < todayIso ? 'overdue' : (r.status || 'pending'));
+      return `<span class="rcal-ev rcal-ev-${esc(st)}" title="${esc(repNameOf(r.userId))} — ${esc(slot)} — ${esc(st)}">${esc(slotStart(slot))} · ${esc(firstName(r.userId))}</span>`;
+    });
+    // any repair booked at a non-standard / blank slot (e.g. staff-edited) gets its own extra row
+    reps.filter(r => !used.has(r.id)).forEach(r => {
+      const st = r.status === 'done' ? 'done' : (iso < todayIso ? 'overdue' : (r.status || 'pending'));
+      rows.push(`<span class="rcal-ev rcal-ev-${esc(st)}" title="${esc(repNameOf(r.userId))} — ${esc(r.timeSlot || 'no slot')} — ${esc(st)}">${esc(r.timeSlot ? slotStart(r.timeSlot) : '?')} · ${esc(firstName(r.userId))}</span>`);
+    });
+    return rows.join('');
+  };
+  let cells = '';
+  for (let i = 0; i < startDow; i++) cells += `<div class="rcal-cell rcal-empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const reps = (byDate[iso] || []).slice().sort((a, b) => (a.timeSlot || '').localeCompare(b.timeSlot || ''));
+    const overdue = reps.some(r => r.status !== 'done' && iso < todayIso);
+    cells += `<button type="button" class="rcal-cell${iso === todayIso ? ' is-today' : ''}${iso === REP_CAL_DAY ? ' is-sel' : ''}${overdue ? ' is-overdue' : ''}" data-day="${iso}">
+      <span class="rcal-num">${d}</span>
+      <span class="rcal-evs">${slotRowsFor(reps, iso)}</span>
+      ${reps.length ? `<span class="rcal-count">${reps.length}</span>` : ''}
+    </button>`;
+  }
+  host.innerHTML = `
+    <div class="rcal-head">
+      <button type="button" class="btn btn-ghost btn-sm" id="rcalPrev" aria-label="Previous month">‹</button>
+      <strong class="rcal-title">${esc(monthName)}</strong>
+      <button type="button" class="btn btn-ghost btn-sm" id="rcalNext" aria-label="Next month">›</button>
+    </div>
+    <div class="rcal-grid">${dows}${cells}</div>
+    <div id="rcalDay"></div>`;
+  $('#rcalPrev').addEventListener('click', () => { REP_CAL_MONTH = new Date(y, mo - 1, 1); paintRepairRows(); });
+  $('#rcalNext').addEventListener('click', () => { REP_CAL_MONTH = new Date(y, mo + 1, 1); paintRepairRows(); });
+  $$('#repRows .rcal-cell[data-day]').forEach(b => b.addEventListener('click', () => { REP_CAL_DAY = b.dataset.day; paintRepairRows(); }));
+  const dayHost = $('#rcalDay');
+  if (REP_CAL_DAY) {
+    const reps = (byDate[REP_CAL_DAY] || []).slice().sort((a, b) => (a.timeSlot || '').localeCompare(b.timeSlot || ''));
+    const nice = new Date(REP_CAL_DAY + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' });
+    dayHost.innerHTML = `<h4 class="rcal-day-h">${esc(nice)} — ${reps.length} repair(s)</h4>` +
+      (reps.length ? reps.map(r => (r.status === 'done' || r.status === 'cancelled') ? doneRow(r) : scheduledRow(r)).join('')
+        : '<p class="empty-note">No repairs on this day.</p>');
+    wireRepairRows();
+  } else {
+    dayHost.innerHTML = '<p class="section-lead" style="margin-top:1rem">Tap a day to see its repairs.</p>';
+  }
 }
 
 function wireRepairRows() {
@@ -2489,12 +2606,17 @@ function openNewRepair() {
   // customers in scope (staff: own branch; admin: whichever branch is selected, or all)
   const inScope = (c) => isAdmin() ? (REP_BRANCH === 'all' || !REP_BRANCH || c.branch === REP_BRANCH) : (c.branch === myBranch());
   const custs = CUSTOMERS.filter(inScope).sort((a, b) => (a.name || a.username || '').localeCompare(b.name || b.username || ''));
-  const custOpts = custs.map(c => `<option value="${esc(c.id)}">${esc(c.name || c.username)}${c.branch ? ' — ' + esc(branchShort(c.branch)) : ''}</option>`).join('');
   $('#panelBody').innerHTML = `
     <h3 class="panel-title">➕ New repair</h3>
     <p class="panel-sub">Book a repair for a customer. Only e-bikes they own can be selected.</p>
     <form class="form" id="newRepForm">
-      <label>Customer <select name="userId" id="nrCustomer" required><option value="" disabled selected>— choose a customer —</option>${custOpts}</select></label>
+      <label>Customer
+        <div class="combo" id="nrCustCombo">
+          <input type="hidden" name="userId" id="nrCustomer" />
+          <input type="text" id="nrCustSearch" class="combo-input" autocomplete="off" placeholder="Type a name to search…" aria-label="Search customer" />
+          <div class="combo-list hidden" id="nrCustList"></div>
+        </div>
+      </label>
       <label>E-bike <select name="modelId" id="nrModel" required disabled><option value="">— pick a customer first —</option></select></label>
       <label>Service type <select name="repairType"><option value="">— not set —</option>${REPAIR_TYPES.map(t => `<option>${esc(t)}</option>`).join('')}</select></label>
       <label>Date <input name="date" id="nrDate" type="date" required min="${today10()}" /></label>
@@ -2505,16 +2627,39 @@ function openNewRepair() {
       <button class="btn btn-primary full" type="submit">Create repair</button>
     </form>`;
   $('#panelModal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
-  const REP_SLOTS = ['08:00–10:00', '10:00–12:00', '13:00–15:00', '15:00–17:00'];
-  const custSel = $('#nrCustomer'), modelSel = $('#nrModel'), dateEl = $('#nrDate'), slotSel = $('#nrSlot'), slotHint = $('#nrSlotHint');
-  custSel.addEventListener('change', () => {
-    const units = EBIKES_BY_USER[custSel.value] || [];
+  const REP_SLOTS = REPAIR_SLOTS;
+  const hiddenEl = $('#nrCustomer'), searchEl = $('#nrCustSearch'), listEl = $('#nrCustList'), comboEl = $('#nrCustCombo');
+  const modelSel = $('#nrModel'), dateEl = $('#nrDate'), slotSel = $('#nrSlot'), slotHint = $('#nrSlotHint');
+  // --- searchable customer picker: show only a handful of matches, narrow by typing ---
+  const CUST_MAX = 8;
+  const custLabel = c => (c.name || c.username) + (c.branch ? ' — ' + branchShort(c.branch) : '');
+  const fillModels = userId => {
+    const units = EBIKES_BY_USER[userId] || [];
     const seen = new Set();
     const opts = units.filter(e => !seen.has(e.model_id) && seen.add(e.model_id)).map(e => {
       const m = STORE.modelById(e.model_id); return `<option value="${esc(e.model_id)}">${esc(m ? m.name : e.model_id)}</option>`;
     }).join('');
     modelSel.innerHTML = opts || '<option value="">— this customer has no e-bike on file —</option>';
     modelSel.disabled = !opts;
+  };
+  const resetModels = () => { modelSel.innerHTML = '<option value="">— pick a customer first —</option>'; modelSel.disabled = true; };
+  const paintCustList = q => {
+    q = (q || '').toLowerCase().trim();
+    const matches = q ? custs.filter(c => `${c.name || ''} ${c.username || ''} ${branchShort(c.branch) || ''}`.toLowerCase().includes(q)) : custs;
+    const shown = matches.slice(0, CUST_MAX);
+    if (!custs.length) listEl.innerHTML = `<div class="combo-empty">No customers in this branch.</div>`;
+    else if (!matches.length) listEl.innerHTML = `<div class="combo-empty">No customers match “${esc(q)}”.</div>`;
+    else listEl.innerHTML = shown.map(c => `<button type="button" class="combo-opt" data-id="${esc(c.id)}">${esc(custLabel(c))}</button>`).join('')
+      + (matches.length > shown.length ? `<div class="combo-more">+${matches.length - shown.length} more — keep typing to narrow…</div>` : '');
+    listEl.classList.remove('hidden');
+  };
+  searchEl.addEventListener('focus', () => paintCustList(searchEl.value));
+  searchEl.addEventListener('input', () => { hiddenEl.value = ''; resetModels(); paintCustList(searchEl.value); });
+  searchEl.addEventListener('blur', () => setTimeout(() => listEl.classList.add('hidden'), 150));
+  listEl.addEventListener('click', e => {
+    const b = e.target.closest('.combo-opt'); if (!b) return;
+    const c = custs.find(x => x.id === b.dataset.id); if (!c) return;
+    hiddenEl.value = c.id; searchEl.value = custLabel(c); listEl.classList.add('hidden'); fillModels(c.id);
   });
   const paintNrSlots = async () => {
     const date = dateEl.value;
