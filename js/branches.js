@@ -10,16 +10,18 @@
  * There are 9 branches. `main` (Buhay na Tubig, Imus) is the company's home /
  * "THIS BRANCH" highlight on the public site.
  */
+// `loc` = a short general location shown as a hint in branch pickers so a customer
+// can tell which branch is nearest (main already carries its area in the name).
 const BRANCHES = [
-  { key: 'main',   name: 'Main — Buhay na Tubig, Imus', short: 'Main',   code: 'MAIN' },
-  { key: 'imus',   name: 'Imus Branch',                 short: 'Imus',   code: 'IMUS' },
-  { key: 'trece',  name: 'Trece Branch',                short: 'Trece',  code: 'TRECE' },
-  { key: 'tanza',  name: 'Tanza Branch',                short: 'Tanza',  code: 'TANZA' },
-  { key: 'naic',   name: 'Naic Branch',                 short: 'Naic',   code: 'NAIC' },
-  { key: 'tejero', name: 'Tejero Branch',               short: 'Tejero', code: 'TEJERO' },
-  { key: 'gma',    name: 'GMA Branch',                  short: 'GMA',    code: 'GMA' },
-  { key: 'silang',   name: 'Silang Branch',             short: 'Silang',    code: 'SILANG' },
-  { key: 'sanroque', name: 'San Roque Branch',          short: 'San Roque', code: 'SANROQUE' }
+  { key: 'main',   name: 'Main — Buhay na Tubig, Imus', short: 'Main',   code: 'MAIN',     loc: '' },
+  { key: 'imus',   name: 'Imus Branch',                 short: 'Imus',   code: 'IMUS',     loc: 'near Robinsons Place, Imus' },
+  { key: 'trece',  name: 'Trece Branch',                short: 'Trece',  code: 'TRECE',    loc: 'Brgy. San Agustin, Trece Martires' },
+  { key: 'tanza',  name: 'Tanza Branch',                short: 'Tanza',  code: 'TANZA',    loc: 'Tanza, Cavite' },
+  { key: 'naic',   name: 'Naic Branch',                 short: 'Naic',   code: 'NAIC',     loc: 'Ibayo Silangan, Naic' },
+  { key: 'tejero', name: 'Tejero Branch',               short: 'Tejero', code: 'TEJERO',   loc: 'General Trias' },
+  { key: 'gma',    name: 'GMA Branch',                  short: 'GMA',    code: 'GMA',      loc: 'Gen. Mariano Alvarez' },
+  { key: 'silang',   name: 'Silang Branch',             short: 'Silang',    code: 'SILANG',   loc: 'Silang, Cavite' },
+  { key: 'sanroque', name: 'San Roque Branch',          short: 'San Roque', code: 'SANROQUE', loc: 'San Roque, Naic' }
 ];
 
 const BRANCH_BY_KEY = Object.fromEntries(BRANCHES.map(b => [b.key, b]));
@@ -42,7 +44,8 @@ function branchOptionsHtml(sel, opts = {}) {
   let html = '';
   if (opts.placeholder) html += `<option value="" ${!sel ? 'selected' : ''} disabled>${escv(opts.placeholder)}</option>`;
   if (opts.all) html += `<option value="" ${!sel ? 'selected' : ''}>${escv(opts.allLabel || 'All branches')}</option>`;
-  // translate="no": branch names are Filipino proper nouns — keep Google Translate from mangling them
-  html += BRANCHES.map(b => `<option value="${b.key}" translate="no" class="notranslate" ${b.key === sel ? 'selected' : ''}>${escv(b.name)}</option>`).join('');
+  // translate="no": branch names are Filipino proper nouns — keep Google Translate from mangling them.
+  // Append the branch's general location (if any) so pickers show e.g. "Trece Branch — Brgy. San Agustin".
+  html += BRANCHES.map(b => `<option value="${b.key}" translate="no" class="notranslate" ${b.key === sel ? 'selected' : ''}>${escv(b.name)}${b.loc ? ' — ' + escv(b.loc) : ''}</option>`).join('');
   return html;
 }

@@ -2,7 +2,7 @@
 
 > Purpose: this file is the single source of truth for how the project works, so a fresh
 > session can skip re-exploring the codebase. **Keep it updated on every change.**
-> Last updated: 2026-10-14.
+> Last updated: 2026-11-10.
 
 ## What it is
 Static marketing + member site for **Lucky Lion eBike (Trece Martires, Cavite)**. Capstone
@@ -203,6 +203,49 @@ User can deploy Netlify only a few times but can run SQL freely → **build/veri
 - **Pending SQL:** run **`supabase/RUN-ALL-new-features.sql`** — a single combined file with all of it (variants+stock, pre-loved + its 1-of-1 unit columns `color/chassis_no/battery_no/motor_no/sold`, unit details+acquired date, messages). Re-running is safe (idempotent), so if you ran an earlier version just run it again for the new pre-loved columns. Individual files (`variants.sql`, `ebike-details.sql`, `preloved.sql`, `preloved-details.sql`, `unit-acquired.sql`, `messages.sql`) remain for reference. NOTE: adding a customer unit now always sends the new `user_ebikes` columns (incl. `acquired_at`), so `ebike-details.sql` **and** `unit-acquired.sql` must be run or unit-add fails.
 
 ## Recent changes log
+- 2026-11-10: **Admin QA fix batch — 9 items incl. Trash Bin + Activity Log (item 2).** From a
+  panel/QA feedback list; implemented on branch `changes/admin-fixes`. **NEW SQL (pending user run):
+  `supabase/trash-activity.sql`** — adds `deleted_at timestamptz` to `users`/`repairs`/`user_ebikes`
+  + a new `activity_log` table (idempotent, open RLS). The app **auto-detects** whether this is run
+  (`API.detectTrash()` probes `users.deleted_at` at staff-portal init; `js/api.js`): until it's run
+  everything behaves exactly as before (permanent deletes; Trash/Activity show a "not set up yet"
+  note). Items:
+  - **#1 Branch asterisk** — Create-User `#createBranch` select gained `required` (`staff.html`), so
+    `markRequired()` now paints the red `*` like the other required fields.
+  - **#2 Soft-delete → Trash Bin + Activity Log** — when the migration is present, `deleteUser`/
+    `removeUserEbike`/`deleteRepair` PATCH `deleted_at` instead of hard-DELETE; all list queries filter
+    `deleted_at=is.null` (`nd()` helper). New admin-only drawer items **🗑️ Trash Bin** (`#trash`,
+    `renderTrash`/`trashRow`/`wireTrash` → restore / delete-forever via `API.restoreItem`/`purgeItem`)
+    and **📜 Activity Log** (`#activity`, `renderActivity` → `API.getActivityLog`). `createUser`/
+    `addUserEbike`/delete/restore/purge write to `activity_log` via `logActivity()`; `API.setActor(me)`
+    stamps who acted. Added to `VIEWS` + `ADMIN_ONLY_VIEWS`; delete confirms reword to "Move to Trash"
+    when active. New `.trash-row`/`.trash-setup`/`.act-*` CSS; two new `<section>`s in `staff.html`.
+  - **#3 Hide member code in Inbox popup** — `openCustomerDetail` (inbox 👤 View details) panel-sub is
+    now `@username · branch` (member ID removed; still shown in registry + own profile).
+  - **#4 Phone digits-only** — `wirePhoneDigits()` (delegated `input` listener stripping non-digits,
+    keeps `+ - ( )` space) in **both** `staff.js` + `app.js`; `inputmode="numeric"` on the Create-User,
+    signup, profile + branch-phone inputs. (Verified: "abc0917def555" → "0917555".)
+  - **#5 Branch dropdown shows location** — each `BRANCHES` entry gained a `loc` (barangay/area);
+    `branchOptionsHtml` appends " — <loc>", so every branch `<select>` reads e.g. "Trece Branch —
+    Brgy. San Agustin, Trece Martires" (`js/branches.js`).
+  - **#6 "Select unit" default** — the add-unit + Create-User model `<select>` prepend a disabled
+    selected `Select unit` placeholder (no more auto-first-model); add-unit guards an empty pick.
+  - **#7 One colour control** — dropped the redundant `colorLabelField` from the add-unit box, the
+    edit-unit form, and the Create-User unit block; the colour now comes straight from the available-
+    colours variant `<select>` (`variantColorName()`; `readUnitDetail`/create read it).
+  - **#8 Separate + collapsible Add-unit** — the add-unit form is now its own bordered
+    `<details class="add-unit-card">` ("➕ Add a unit ▾"), collapsed by default, separate from the
+    Units list (`.units-block`). New `.add-unit-card` CSS.
+  - **#9 Stronger separators** — `--line` `#e7e9ee`→`#dcdfe6` + new `--divider #c3c8d2`; form/unit
+    section rules use `2px solid var(--divider)`.
+  - **Verified in-browser** (admin login, live Supabase): all 9 items, Trash/Activity render the
+    graceful "not set up yet" note (SQL not yet run), dashboard/users/create intact, **zero console
+    errors**. JS parse-checked (jsc); CSS braces balanced (1187/1187). Cache-bust bumped to
+    **`20261110a`** on the changed assets (styles.css both pages; branches.js + api.js both; app.js
+    index; staff.js staff). `deploy/` synced (7 files, mirror verified) + `lucky-lion-site.zip`
+    rebuilt (index.html at root). **PENDING USER ACTION:** (1) run `supabase/trash-activity.sql` in
+    Supabase → SQL Editor (one time; without it deletes stay permanent and Trash/Activity show the
+    setup note — nothing breaks); (2) drag `lucky-lion-site.zip` to Netlify.
 - 2026-10-26 (c): **Removed the redundant single "Business hours" field from Site Settings.** It
   duplicated the per-branch **🕘 Branch operating hours** editor (`branch_hours` JSON). Deleted the
   `<label>Business hours <input name="hours"></label>` from `staff.html` and dropped `'hours'` from

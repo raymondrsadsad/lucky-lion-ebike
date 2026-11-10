@@ -17,6 +17,29 @@ const API = (() => {
   const SESSION_KEY = 'LL_SESSION';
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
+  // ---- Trash Bin + Activity Log (item 2) ----
+  // TRASH is flipped on at startup by detectTrash() only if the `deleted_at` columns
+  // and `activity_log` table exist (supabase/trash-activity.sql has been run). Until then
+  // everything behaves exactly as before: hard deletes, empty Trash/Activity.
+  let TRASH = false;        // soft-delete + audit available?
+  let ACTOR = null;         // who is acting (for the audit trail)
+  const nd = () => (TRASH ? '&deleted_at=is.null' : '');   // "not deleted" list filter
+  async function logActivity(entry) {
+    if (!TRASH) return;
+    try {
+      await req(`/activity_log`, {
+        method: 'POST',
+        body: JSON.stringify({
+          id: uid(),
+          actor: (ACTOR && (ACTOR.name || ACTOR.username)) || 'system',
+          actor_role: (ACTOR && ACTOR.role) || null,
+          action: entry.action, entity: entry.entity,
+          entity_id: entry.entityId || null, summary: entry.summary || ''
+        })
+      });
+    } catch { /* never block the real operation on an audit write */ }
+  }
+
   // ---- REST helpers ----
   async function req(path, opts = {}) {
     const res = await fetch(`${BASE}${path}`, { ...opts, headers: { ...HEADERS, ...(opts.headers || {}) } });
@@ -34,7 +57,8 @@ const API = (() => {
   const toApp = (r) => r && ({
     id: r.id, memberId: r.member_id, role: r.role, username: r.username, password: r.password,
     name: r.name, email: r.email, phone: r.phone, address: r.address, ownedModelId: r.owned_model_id,
-    avatarUrl: r.avatar_url, branch: r.branch, mustChangePassword: !!r.must_change_password
+    avatarUrl: r.avatar_url, branch: r.branch, mustChangePassword: !!r.must_change_password,
+    deletedAt: r.deleted_at
   });
   const userToRow = (u) => ({
     id: u.id, member_id: u.memberId, role: u.role, username: u.username, password: u.password,
@@ -44,7 +68,8 @@ const API = (() => {
   const repToApp = (r) => r && ({
     id: r.id, userId: r.user_id, modelId: r.model_id, date: r.date,
     timeSlot: r.time_slot, status: r.status, notes: r.notes,
-    repairType: r.repair_type, cost: r.cost, completedAt: r.completed_at, branch: r.branch
+    repairType: r.repair_type, cost: r.cost, completedAt: r.completed_at, branch: r.branch,
+    deletedAt: r.deleted_at
   });
   const msgToApp = (r) => r && ({ id: r.id, userId: r.user_id, sender: r.sender, body: r.body, read: r.read, createdAt: r.created_at });
 
@@ -73,8 +98,8 @@ const API = (() => {
     },
 
     // ---- users ----
-    async getUsers() { return (await req(`/users?select=*&order=created_at`) || []).map(toApp); },
-    async getCustomers() { return (await req(`/users?role=eq.customer&select=*`) || []).map(toApp); },
+    async getUsers() { return (await req(`/users?select=*${nd()}&order=created_at`) || []).map(toApp); },
+    async getCustomers() { return (await req(`/users?role=eq.customer&select=*${nd()}`) || []).map(toApp); },
     async createUser(data) {
       const dup = await req(`/users?username=eq.${encodeURIComponent(data.username.trim())}&select=id`);
       if (dup && dup.length) throw new Error('Username already taken.');
@@ -111,6 +136,7 @@ const API = (() => {
         delete row.must_change_password;
         created = await req(`/users`, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
       }
+      await logActivity({ action: 'create', entity: role, entityId: created[0].id, summary: `Created ${role} ${row.name || row.username} (${memberId})` });
       return toApp(created[0]);
     },
     async updateUser(id, patch) {
@@ -148,14 +174,19 @@ const API = (() => {
       if (!up.ok) { let m = `Upload failed (${up.status})`; try { const e = await up.json(); m = e.message || e.error || m; } catch { } throw new Error(m); }
       return `${SUPABASE.url}/storage/v1/object/public/store-photos/${name}`;
     },
-    async deleteUser(id) {
-      await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+    async deleteUser(id, label) {
+      if (TRASH) {
+        await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
+        await logActivity({ action: 'delete', entity: 'customer', entityId: id, summary: `Moved ${label || 'a customer'} to Trash` });
+      } else {
+        await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+      }
       return true;
     },
 
     // ---- user e-bike units (a customer can own several) ----
-    async getUserEbikes(userId) { return (await req(`/user_ebikes?user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at`)) || []; },
-    async getAllUserEbikes() { return (await req(`/user_ebikes?select=*&order=created_at`)) || []; },
+    async getUserEbikes(userId) { return (await req(`/user_ebikes?user_id=eq.${encodeURIComponent(userId)}&select=*${nd()}&order=created_at`)) || []; },
+    async getAllUserEbikes() { return (await req(`/user_ebikes?select=*${nd()}&order=created_at`)) || []; },
     // Add a unit to a customer. `detail` may carry a chosen colour variant + the
     // physical identifiers; passing a variantId also decrements that colour's stock.
     async addUserEbike(userId, modelId, detail = {}) {
@@ -172,6 +203,7 @@ const API = (() => {
       // Decrement the stock of the branch that handed over the unit (the customer's branch).
       if (detail.variantId && detail.branch) { try { await this.decrementVariantStock(detail.variantId, detail.branch); } catch { } }
       else if (detail.variantId) { try { await this.decrementStock(detail.variantId); } catch { } }
+      await logActivity({ action: 'create', entity: 'unit', entityId: rec[0].id, summary: `Assigned a unit${detail.label ? ' — ' + detail.label : ''}` });
       return rec[0];
     },
     async updateUserEbike(id, patch) {
@@ -189,8 +221,13 @@ const API = (() => {
       const updated = await req(`/user_ebikes?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
       return updated && updated[0];
     },
-    async removeUserEbike(id) {
-      await req(`/user_ebikes?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+    async removeUserEbike(id, label) {
+      if (TRASH) {
+        await req(`/user_ebikes?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
+        await logActivity({ action: 'delete', entity: 'unit', entityId: id, summary: `Moved ${label || 'an e-bike unit'} to Trash` });
+      } else {
+        await req(`/user_ebikes?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+      }
       return true;
     },
     async changePassword(id, current, next) {
@@ -204,12 +241,12 @@ const API = (() => {
     },
 
     // ---- repairs ----
-    async getRepairs() { return (await req(`/repairs?select=*&order=date`) || []).map(repToApp); },
-    async getRepairsByUser(userId) { return (await req(`/repairs?user_id=eq.${encodeURIComponent(userId)}&select=*&order=date`) || []).map(repToApp); },
+    async getRepairs() { return (await req(`/repairs?select=*${nd()}&order=date`) || []).map(repToApp); },
+    async getRepairsByUser(userId) { return (await req(`/repairs?user_id=eq.${encodeURIComponent(userId)}&select=*${nd()}&order=date`) || []).map(repToApp); },
     // Which time slots on a date are already booked? A repair only frees its slot once it's done.
     async getBookedSlots(date) {
       if (!date) return [];
-      const rows = await req(`/repairs?date=eq.${encodeURIComponent(date)}&select=id,time_slot,status`) || [];
+      const rows = await req(`/repairs?date=eq.${encodeURIComponent(date)}&select=id,time_slot,status${nd()}`) || [];
       // a repair frees its slot once it's done OR cancelled
       return rows.filter(r => r.status !== 'done' && r.status !== 'cancelled').map(r => ({ id: r.id, slot: r.time_slot }));
     },
@@ -217,7 +254,7 @@ const API = (() => {
     // Returns { 'YYYY-MM-DD': ['08:00–10:00', ...] } of slots that still hold a booking.
     async getBookedSlotsRange(startDate, endDate) {
       if (!startDate || !endDate) return {};
-      const rows = await req(`/repairs?date=gte.${encodeURIComponent(startDate)}&date=lte.${encodeURIComponent(endDate)}&select=date,time_slot,status`) || [];
+      const rows = await req(`/repairs?date=gte.${encodeURIComponent(startDate)}&date=lte.${encodeURIComponent(endDate)}&select=date,time_slot,status${nd()}`) || [];
       const map = {};
       rows.filter(r => r.status !== 'done' && r.status !== 'cancelled').forEach(r => { (map[r.date] ??= []).push(r.time_slot); });
       return map;
@@ -251,9 +288,51 @@ const API = (() => {
       const updated = await req(`/repairs?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
       return repToApp(updated[0]);
     },
-    async deleteRepair(id) {
-      await req(`/repairs?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+    async deleteRepair(id, label) {
+      if (TRASH) {
+        await req(`/repairs?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
+        await logActivity({ action: 'delete', entity: 'repair', entityId: id, summary: `Moved ${label || 'a repair'} to Trash` });
+      } else {
+        await req(`/repairs?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+      }
       return true;
+    },
+
+    // ---- Trash Bin + Activity Log (item 2) ----
+    // Everything an admin soft-deleted, newest first. Empty + harmless if the SQL isn't run.
+    async getTrash() {
+      if (!TRASH) return { users: [], ebikes: [], repairs: [] };
+      const [users, ebikes, repairs] = await Promise.all([
+        req(`/users?deleted_at=not.is.null&select=*&order=deleted_at.desc`).catch(() => []),
+        req(`/user_ebikes?deleted_at=not.is.null&select=*&order=deleted_at.desc`).catch(() => []),
+        req(`/repairs?deleted_at=not.is.null&select=*&order=deleted_at.desc`).catch(() => [])
+      ]);
+      return { users: (users || []).map(toApp), ebikes: (ebikes || []), repairs: (repairs || []).map(repToApp) };
+    },
+    async restoreItem(kind, id, label) {
+      const table = kind === 'customer' ? 'users' : kind === 'unit' ? 'user_ebikes' : 'repairs';
+      await req(`/${table}?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ deleted_at: null }) });
+      await logActivity({ action: 'restore', entity: kind, entityId: id, summary: `Restored ${label || kind}` });
+      return true;
+    },
+    async purgeItem(kind, id, label) {
+      const table = kind === 'customer' ? 'users' : kind === 'unit' ? 'user_ebikes' : 'repairs';
+      await req(`/${table}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await logActivity({ action: 'purge', entity: kind, entityId: id, summary: `Permanently deleted ${label || kind}` });
+      return true;
+    },
+    async getActivityLog(limit = 100) {
+      if (!TRASH) return [];
+      const rows = await req(`/activity_log?select=*&order=at.desc&limit=${limit}`).catch(() => []);
+      return (rows || []).map(r => ({ id: r.id, at: r.at, actor: r.actor, actorRole: r.actor_role, action: r.action, entity: r.entity, entityId: r.entity_id, summary: r.summary }));
+    },
+    setActor(u) { ACTOR = u || null; },
+    trashReady() { return TRASH; },
+    // Probe whether the trash-activity migration has been run; flips on soft-delete if so.
+    async detectTrash() {
+      try { await req(`/users?select=id,deleted_at&limit=1`); TRASH = true; }
+      catch { TRASH = false; }
+      return TRASH;
     },
 
     // ---- model meta (badges, sale, price overrides, custom models) ----

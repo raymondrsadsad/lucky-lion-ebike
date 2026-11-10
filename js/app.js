@@ -140,8 +140,20 @@ const modelById2 = (id) => MODELS.find(m => m.id === id) || STORE.modelById(id);
 
 document.addEventListener('DOMContentLoaded', init);
 
+// #4: contact-number fields (sign-up, profile) accept digits + usual separators only — block letters
+function wirePhoneDigits() {
+  const bad = /[^\d+\-() ]/g;
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (!t || !t.matches || !t.matches('input[name="phone"]')) return;
+    const clean = t.value.replace(bad, '');
+    if (clean !== t.value) { const p = t.selectionStart; t.value = clean; try { t.setSelectionRange(p - 1, p - 1); } catch { } }
+  });
+}
+
 async function init() {
   await API.init();
+  wirePhoneDigits();
   await STORE.load();
   C = STORE.content;
   // The home / "THIS BRANCH" highlight is the main branch (Buhay na Tubig, Imus).
@@ -1463,7 +1475,7 @@ async function panelProfile(user) {
     <form class="form" id="profileForm">
       <label>Full name <input name="name" value="${esc(user.name)}" required /></label>
       <label>Email <input name="email" type="email" value="${esc(user.email)}" /></label>
-      <label>Phone <input name="phone" value="${esc(user.phone)}" required /></label>
+      <label>Phone <input name="phone" value="${esc(user.phone)}" inputmode="numeric" required /></label>
       <label>Address <input name="address" value="${esc(user.address)}" required /></label>
       <label>Nearest branch <select name="branch" required>${branchOptionsHtml(user.branch)}</select></label>
       <p class="form-ok hidden" id="profOk">Saved.</p>
