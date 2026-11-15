@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css?v=20261108a" />
+  <link rel="stylesheet" href="css/styles.css?v=20261115a" />
 </head>
 <body>
   <div id="themeDecor" aria-hidden="true"></div>
@@ -236,11 +236,12 @@
       <form id="signupForm" class="form">
         <label>Full name <input name="name" autocomplete="name" required /></label>
         <label>Username <input name="username" autocomplete="username" required /></label>
-        <label>Password <input name="password" type="password" autocomplete="new-password" required minlength="4" /></label>
+        <label>Password <input name="password" type="password" autocomplete="new-password" required minlength="8" pattern="(?=.*[A-Z])(?=.*\d).{8,}" title="At least 8 characters, with one uppercase letter and one number." /></label>
+        <p class="pw-hint">At least 8 characters, 1 uppercase letter and 1 number.</p>
         <label class="checkbox chk-show"><input type="checkbox" id="signupShowPass" /> Show password</label>
         <div class="grid2">
-          <label>Phone <input name="phone" autocomplete="tel" /></label>
-          <label>Email <input name="email" type="email" autocomplete="email" /></label>
+          <label>Phone <input name="phone" autocomplete="tel" required /></label>
+          <label>Email <input name="email" type="email" autocomplete="email" required /></label>
         </div>
         <label>Address <input name="address" autocomplete="street-address" /></label>
         <label>Nearest branch <select name="branch" id="signupBranch" required>
@@ -265,7 +266,7 @@
   <script src="js/branches.js?v=20260917g"></script>
   <script src="js/themes.js?v=20260827a"></script>
   <script src="js/store.js?v=20260827a"></script>
-  <script src="js/api.js?v=20261012c"></script>
-  <script src="js/app.js?v=20261108a"></script>
+  <script src="js/api.js?v=20261115a"></script>
+  <script src="js/app.js?v=20261115a"></script>
 </body>
 </html>

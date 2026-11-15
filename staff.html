@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css?v=20261108a" />
+  <link rel="stylesheet" href="css/styles.css?v=20261115a" />
   <style>html { scroll-padding-top: 120px; }</style>
 </head>
 <body>
@@ -58,6 +58,7 @@
       <div class="drawer-group">Overview</div>
       <a class="drawer-link" href="#dashboard" data-view="dashboard"><span class="di">📊</span>Dashboard</a>
       <a class="drawer-link" href="#analytics" data-view="analytics"><span class="di">📈</span>Analytics</a>
+      <a class="drawer-link" href="#reviews" data-view="reviews"><span class="di">⭐</span>Reviews</a>
 
       <div class="drawer-group">Customers</div>
       <a class="drawer-link" href="#users" data-view="users"><span class="di">👥</span>Users &amp; E-Bikes</a>
@@ -90,6 +91,13 @@
       <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
       <h2 class="section-title">📈 Analytics</h2>
       <div id="analyticsBody"></div>
+    </section>
+
+    <section class="section view" id="reviews">
+      <button class="view-back" type="button"><span aria-hidden="true">←</span> Back to Dashboard</button>
+      <h2 class="section-title">⭐ Customer Reviews</h2>
+      <p class="section-lead">Ratings customers left after their repairs.</p>
+      <div id="reviewsBody"></div>
     </section>
 
     <section class="section view" id="users">
@@ -132,9 +140,22 @@
           </label>
           <label>Full name <input name="name" autocomplete="name" required /></label>
           <label>Username <input name="username" autocomplete="username" required /></label>
-          <label>Temporary password <input name="password" autocomplete="new-password" required minlength="4" /></label>
-          <label>Phone <input name="phone" autocomplete="tel" /></label>
-          <label>Email <input name="email" type="email" autocomplete="email" /></label>
+          <div class="pw-field">
+            <span class="pw-field-label">Temporary password <span class="req" aria-hidden="true">*</span></span>
+            <div class="pw-mode">
+              <label class="checkbox"><input type="radio" name="pwMode" value="auto" checked /> Auto-generate</label>
+              <label class="checkbox"><input type="radio" name="pwMode" value="manual" /> Set manually</label>
+            </div>
+            <div class="pw-auto" id="createPwAuto">
+              <input id="createPwAutoInput" name="passwordAuto" readonly aria-label="Auto-generated temporary password" />
+              <button type="button" class="btn btn-ghost btn-sm" id="createPwRegen" title="Generate another">↻ New</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="createPwCopy" title="Copy password">Copy</button>
+            </div>
+            <input class="pw-manual hidden" id="createPwManual" name="passwordManual" type="text" autocomplete="new-password" placeholder="Type a password" pattern="(?=.*[A-Z])(?=.*\d).{8,}" title="At least 8 characters, with one uppercase letter and one number." />
+            <p class="pw-hint">At least 8 characters, 1 uppercase letter and 1 number. Staff shares this with the customer; they change it on first login.</p>
+          </div>
+          <label>Phone <input name="phone" autocomplete="tel" required /></label>
+          <label>Email <input name="email" type="email" autocomplete="email" required /></label>
           <label>Address <input name="address" autocomplete="street-address" /></label>
           <label>E-bike purchased (customers)
             <select name="ownedModelId" id="ownedSelect"><option value="">— none —</option></select>
@@ -174,8 +195,22 @@
             <label>Type
               <select name="wheels"><option value="4-wheels">4 Wheels</option><option value="3-wheels">3 Wheels</option><option value="2-wheels">2 Wheels</option></select>
             </label>
-            <label>Motor (Watts) <input name="motor_w" type="number" /></label>
-            <label>Battery <input name="battery" placeholder="e.g. 60V/20AH Lead Acid" /></label>
+            <label>Motor (Watts)
+              <select class="spec-select" name="motor_w">
+                <option value="" selected>— choose —</option>
+                <option value="500">500W</option><option value="650">650W</option><option value="800">800W</option><option value="1000">1000W</option><option value="1200">1200W</option><option value="1500">1500W</option><option value="2000">2000W</option><option value="2500">2500W</option>
+                <option value="__other__">Other…</option>
+              </select>
+              <input class="spec-other hidden" name="motor_wOther" type="number" placeholder="Type watts (number)" />
+            </label>
+            <label>Battery
+              <select class="spec-select" name="battery">
+                <option value="" selected>— choose —</option>
+                <option>48V/20AH Lead Acid</option><option>60V/20AH Lead Acid</option><option>60V/30AH Lead Acid</option><option>60V/32AH Lead Acid</option><option>60V/45AH Lead Acid</option><option>60V/65AH Lead Acid</option>
+                <option value="__other__">Other…</option>
+              </select>
+              <input class="spec-other hidden" name="batteryOther" placeholder="e.g. 60V/20AH Lead Acid" />
+            </label>
             <label>Brakes <input name="brakes" placeholder="e.g. Front Disc / Rear Drum" /></label>
             <label>Price (SRP) <input name="srp" type="number" /></label>
             <div class="mp-block">
@@ -323,7 +358,7 @@
           <label>Google Maps link <input name="maps" autocomplete="off" /></label>
           <p class="form-ok hidden" id="settingsOk">Saved — changes are live.</p>
           <p class="form-error hidden" id="settingsErr"></p>
-          <button class="btn btn-primary" type="submit">Save settings</button>
+          <button class="btn btn-success" type="submit">Save settings</button>
         </form>
       </div>
     </section>
@@ -359,16 +394,20 @@
       </label>
       <p class="form-error hidden" id="cropErr"></p>
       <button class="btn btn-ghost full" id="cropReset" type="button" style="margin-bottom:.5rem">↺ Reset position &amp; zoom</button>
-      <button class="btn btn-primary full" id="cropSave">Save photo</button>
+      <button class="btn btn-success full" id="cropSave">Save photo</button>
     </div>
   </div>
 
+  <!-- report export libraries (Excel / PDF) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <script src="js/config.js?v=20260827a"></script>
   <script src="js/branches.js?v=20260917g"></script>
   <script src="js/themes.js?v=20260827a"></script>
   <script src="js/poster.js?v=20260916g"></script>
   <script src="js/store.js?v=20260827a"></script>
-  <script src="js/api.js?v=20261012c"></script>
-  <script src="js/staff.js?v=20261026b"></script>
+  <script src="js/api.js?v=20261115a"></script>
+  <script src="js/staff.js?v=20261115a"></script>
 </body>
 </html>

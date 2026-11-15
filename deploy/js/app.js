@@ -24,6 +24,16 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<':
 // nt(): escape + wrap a proper noun (branch / model / brand name) so Google Translate won't mangle it
 const nt = (s) => `<span translate="no">${esc(s)}</span>`;
 
+/* ---------- password policy (≥8 chars, ≥1 uppercase, ≥1 number) ---------- */
+// Returns an error string if the password is too weak, else null.
+function validatePassword(pw) {
+  pw = String(pw || '');
+  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (!/[A-Z]/.test(pw)) return 'Password needs at least one uppercase letter.';
+  if (!/\d/.test(pw)) return 'Password needs at least one number.';
+  return null;
+}
+
 /* ---------- #1: red asterisk on required fields ---------- */
 // Insert a red * right after the label text for any label wrapping a required control.
 // Idempotent + driven by a MutationObserver so dynamically-rendered forms get marked too.
@@ -1006,6 +1016,8 @@ function wireSignup() {
     const username = (f.get('username') || '').trim(), password = f.get('password');
     const branch = f.get('branch') || '';
     if (!branch) { err.textContent = 'Please choose the branch nearest you.'; err.classList.remove('hidden'); return; }
+    const pwErr = validatePassword(password);
+    if (pwErr) { err.textContent = pwErr; err.classList.remove('hidden'); return; }
     if (!(await confirmAction('Create your Lucky Lion account with these details?', { title: 'Create account', confirmLabel: 'Create account' }))) return;
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try {
@@ -1087,11 +1099,12 @@ function forcePasswordChange(user) {
         <h3 class="modal-title">🔒 Set a new password</h3>
         <p class="modal-note">Your account uses a temporary password. Please choose a new one to continue.</p>
         <form class="form" id="forcePwForm">
-          <label>New password <input name="next" type="password" required minlength="4" autocomplete="new-password" /></label>
-          <label>Confirm new password <input name="confirm" type="password" required minlength="4" autocomplete="new-password" /></label>
+          <label>New password <input name="next" type="password" required minlength="8" pattern="(?=.*[A-Z])(?=.*\\d).{8,}" title="At least 8 characters, with one uppercase letter and one number." autocomplete="new-password" /></label>
+          <p class="pw-hint">At least 8 characters, 1 uppercase letter and 1 number.</p>
+          <label>Confirm new password <input name="confirm" type="password" required minlength="8" autocomplete="new-password" /></label>
           <label class="checkbox chk-show"><input type="checkbox" id="forcePwShow" /> Show password</label>
           <p class="form-error hidden" id="forcePwErr"></p>
-          <button class="btn btn-primary full" type="submit">Save new password</button>
+          <button class="btn btn-success full" type="submit">Save new password</button>
         </form></div>`;
       document.body.appendChild(_forcePwHost);
     }
@@ -1106,6 +1119,8 @@ function forcePasswordChange(user) {
       e.preventDefault(); err.classList.add('hidden');
       const f = new FormData(form);
       const next = f.get('next'), confirm = f.get('confirm');
+      const pwErr = validatePassword(next);
+      if (pwErr) { err.textContent = pwErr; err.classList.remove('hidden'); return; }
       if (next !== confirm) { err.textContent = 'The passwords do not match.'; err.classList.remove('hidden'); return; }
       try {
         await API.setNewPassword(user.id, next);
@@ -1462,21 +1477,22 @@ async function panelProfile(user) {
     </div>
     <form class="form" id="profileForm">
       <label>Full name <input name="name" value="${esc(user.name)}" required /></label>
-      <label>Email <input name="email" type="email" value="${esc(user.email)}" /></label>
+      <label>Email <input name="email" type="email" value="${esc(user.email)}" required /></label>
       <label>Phone <input name="phone" value="${esc(user.phone)}" required /></label>
       <label>Address <input name="address" value="${esc(user.address)}" required /></label>
       <label>Nearest branch <select name="branch" required>${branchOptionsHtml(user.branch)}</select></label>
       <p class="form-ok hidden" id="profOk">Saved.</p>
-      <button class="btn btn-primary full" type="submit">Save changes</button>
+      <button class="btn btn-success full" type="submit">Save changes</button>
     </form>
     <hr style="margin:1.4rem 0;border:0;border-top:1px solid var(--line)">
     <h4 style="margin-bottom:.6rem">Change password</h4>
     <form class="form" id="pwForm">
       <label>Current password <input name="current" type="password" required /></label>
-      <label>New password <input name="next" type="password" required minlength="4" /></label>
+      <label>New password <input name="next" type="password" required minlength="8" pattern="(?=.*[A-Z])(?=.*\\d).{8,}" title="At least 8 characters, with one uppercase letter and one number." /></label>
+      <p class="pw-hint">At least 8 characters, 1 uppercase letter and 1 number.</p>
       <p class="form-error hidden" id="pwErr"></p>
       <p class="form-ok hidden" id="pwOk">Password updated.</p>
-      <button class="btn btn-primary full" type="submit">Update password</button>
+      <button class="btn btn-success full" type="submit">Update password</button>
     </form>`;
 }
 function wireProfile(user) {
@@ -1511,6 +1527,8 @@ function wireProfile(user) {
     e.preventDefault();
     const f = new FormData(e.target); const err = $('#pwErr'), ok = $('#pwOk');
     err.classList.add('hidden'); ok.classList.add('hidden');
+    const pwErr = validatePassword(f.get('next'));
+    if (pwErr) { err.textContent = pwErr; err.classList.remove('hidden'); return; }
     if (!(await confirmAction('Update your account password?', { title: 'Change password', confirmLabel: 'Update password' }))) return;
     try {
       await API.changePassword(user.id, f.get('current'), f.get('next'));
@@ -1560,7 +1578,14 @@ async function panelSchedule(user) {
         <select name="timeSlot" id="repSlot" required disabled>${slots.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')}</select>
       </label>
       <p class="slot-hint" id="repSlotHint">Pick a date first — we'll show which slots are still open.</p>
-      <label>Notes (what needs fixing?) <textarea name="notes" rows="3"></textarea></label>
+      <label>What needs fixing?
+        <select name="repairType" id="repIssue" required>
+          <option value="" disabled selected>— choose the main issue —</option>
+          ${REPAIR_ISSUES.map(i => `<option value="${esc(i)}">${esc(i)}</option>`).join('')}
+        </select>
+      </label>
+      <label class="hidden" id="repIssueOtherWrap">Please describe the issue <input name="repairTypeOther" placeholder="e.g. horn not working" /></label>
+      <label>More details (optional) <textarea name="notes" rows="3"></textarea></label>
       <p class="form-ok hidden" id="repOk">Repair booked! Staff will confirm.</p>
       <p class="form-error hidden" id="repErr"></p>
       <button class="btn btn-primary full" type="submit">Book repair</button>
@@ -1631,23 +1656,47 @@ async function renderBookingCalendar() {
     <div class="cal-dow">${['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => `<span>${d}</span>`).join('')}</div>
     <div class="cal-grid">${cells}</div>`;
 }
+// read-only star row (filled up to n of 5)
+function starsRO(n) {
+  n = Number(n) || 0;
+  return `<span class="stars ro">${[1, 2, 3, 4, 5].map(i => `<span class="star${i <= n ? ' on' : ''}">★</span>`).join('')}</span>`;
+}
 function renderMyReps(list) {
   if (!list.length) return `<p class="panel-sub">No bookings yet.</p>`;
   const hasNumbers = allContactNumbers().length > 0;
   return list.map(r => {
     const m = STORE.modelById(r.modelId);
     const bits = unitBits(ebikeForModel(r.modelId));
+    // #9: once a repair is done, let the customer leave a 1–5 star review (or show the one they left)
+    let reviewBlock = '';
+    if (r.status === 'done') {
+      if (r.rating) {
+        reviewBlock = `<div class="review-ro">${starsRO(r.rating)}${r.review ? `<div class="r-cmt">&ldquo;${esc(r.review)}&rdquo;</div>` : ''}</div>`;
+      } else {
+        reviewBlock = `<div class="review-box" data-rep="${esc(r.id)}" data-rating="0">
+          <h5>⭐ How was this repair?</h5>
+          <div class="stars">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="star" data-val="${n}" aria-label="${n} star">★</button>`).join('')}</div>
+          <textarea class="rev-comment" rows="2" placeholder="Add a comment (optional)…" style="width:100%;margin-top:.5rem"></textarea>
+          <button type="button" class="btn btn-success btn-sm rev-submit">Submit review</button>
+          <p class="form-error hidden rev-err"></p>
+        </div>`;
+      }
+    }
     return `<div class="branch"><div><h3>${esc(m ? m.name : r.modelId)}</h3>
       <div class="b-meta">${esc(r.date)} · ${esc(r.timeSlot)} · status: <strong>${esc(r.status)}</strong></div>
+      ${r.repairType ? `<div class="b-meta">🔧 ${esc(r.repairType)}</div>` : ''}
       ${bits.length ? `<div class="b-meta">${bits.map(esc).join(' · ')}</div>` : ''}
       ${r.notes ? `<div class="b-meta">${esc(r.notes)}</div>` : ''}
       <div class="book-actions">
         <button type="button" class="link-btn book-msg">💬 Message the branch</button>
         ${hasNumbers ? `<button type="button" class="link-btn book-call">📞 Call the branch</button>` : ''}
-      </div></div></div>`;
+      </div>
+      ${reviewBlock}</div></div>`;
   }).join('');
 }
 const REPAIR_SLOTS = ['08:00\u201310:00', '10:00\u201312:00', '13:00\u201315:00', '15:00\u201317:00'];
+// Common e-bike issues the customer can pick when booking (matches staff REPAIR_TYPES).
+const REPAIR_ISSUES = ['Battery', 'Brakes', 'Tire / Wheel', 'Motor', 'Electrical / Wiring', 'Controller', 'Tune-up / General', 'Other'];
 
 // One booking per time slot per day: already-booked slots are greyed out and marked "TAKEN".
 async function paintSlots(date) {
@@ -1684,9 +1733,31 @@ function wireSchedule(user) {
   if (mb) mb.addEventListener('click', () => openPanel('messages'));
   // per-booking "message the branch" buttons (delegated — #myReps re-renders after booking)
   const myReps = $('#myReps');
-  if (myReps) myReps.addEventListener('click', e => {
-    if (e.target.closest('.book-msg')) openPanel('messages');
-    else if (e.target.closest('.book-call')) openContactPicker('repairs');   // scheduled repair → repairs line
+  if (myReps) myReps.addEventListener('click', async e => {
+    if (e.target.closest('.book-msg')) { openPanel('messages'); return; }
+    if (e.target.closest('.book-call')) { openContactPicker('repairs'); return; }   // scheduled repair → repairs line
+    // #9: star rating picker
+    const star = e.target.closest('.star');
+    if (star) {
+      const box = star.closest('.review-box'); if (!box) return;
+      const val = Number(star.dataset.val);
+      box.dataset.rating = String(val);
+      box.querySelectorAll('.star').forEach(s => s.classList.toggle('on', Number(s.dataset.val) <= val));
+      return;
+    }
+    // #9: submit the review
+    if (e.target.closest('.rev-submit')) {
+      const box = e.target.closest('.review-box'); if (!box) return;
+      const repId = box.dataset.rep, rating = Number(box.dataset.rating || 0);
+      const err = box.querySelector('.rev-err');
+      if (!rating) { err.textContent = 'Please tap a star rating first.'; err.classList.remove('hidden'); return; }
+      const review = (box.querySelector('.rev-comment') || {}).value || '';
+      try {
+        await API.submitReview(repId, { rating, review });
+        toast('Thanks for your review! ⭐');
+        myReps.innerHTML = renderMyReps(await API.getRepairsByUser(user.id));
+      } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+    }
   });
   const form = $('#repForm');
   if (!form) return;                 // no owned e-bike → no booking form to wire
@@ -1706,6 +1777,12 @@ function wireSchedule(user) {
       day.classList.add('is-sel');
       paintSlots(iso);
     }
+  });
+
+  // reveal the free-text box when the chosen issue is "Other"
+  const issueSel = $('#repIssue'), otherWrap = $('#repIssueOtherWrap');
+  if (issueSel) issueSel.addEventListener('change', () => {
+    if (otherWrap) otherWrap.classList.toggle('hidden', issueSel.value !== 'Other');
   });
 
   form.addEventListener('submit', async e => {
@@ -1729,7 +1806,9 @@ function wireSchedule(user) {
       }
     } catch { /* availability check failed — let the booking through */ }
 
-    await API.createRepair({ userId: user.id, modelId: f.get('modelId'), date, timeSlot: slot, notes: f.get('notes'), branch: user.branch });
+    const issue = f.get('repairType') || '';
+    const repairType = issue === 'Other' ? ((f.get('repairTypeOther') || '').trim() || 'Other') : issue;
+    await API.createRepair({ userId: user.id, modelId: f.get('modelId'), date, timeSlot: slot, repairType: repairType || null, notes: f.get('notes'), branch: user.branch });
     ok.classList.remove('hidden');
     toast('Repair booked! Staff will confirm. 🛠️');
     e.target.reset();

@@ -476,6 +476,9 @@ body[data-theme] .polaroid { box-shadow: 0 0 0 3px var(--frame1, #fff), 0 0 0 6p
 /* danger (delete) buttons in the models manager */
 .btn.btn-ghost.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, var(--line)); }
 .btn.btn-ghost.danger:hover { background: var(--red); border-color: var(--red); color: #fff; }
+/* safety net: delete / cancel / remove actions always read red, even if the danger class is missed */
+.btn.var-del, .btn.del-user, .btn.rep-del, .btn.rep-cancel, .btn.del-model, .btn.remove-model { color: var(--red); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--red) 45%, var(--line)); }
+.btn.var-del:hover, .btn.del-user:hover, .btn.rep-del:hover, .btn.rep-cancel:hover, .btn.del-model:hover, .btn.remove-model:hover { background: var(--red); color: #fff; box-shadow: inset 0 0 0 2px var(--red); }
 /* soft-deleted models: restorable list under the manager */
 .deleted-models { margin-top: 1rem; border: 1px dashed var(--line); border-radius: var(--r-sm); background: var(--mist); }
 .deleted-models > summary { cursor: pointer; padding: .7rem .9rem; font-weight: 600; color: var(--muted); list-style: none; }
@@ -632,7 +635,7 @@ body[data-theme] .polaroid { box-shadow: 0 0 0 3px var(--frame1, #fff), 0 0 0 6p
 .panel-title { font-size: 1.4rem; font-weight: 800; margin-bottom: .3rem; }
 .panel-sub { color: var(--muted); margin: 0 0 1.2rem; font-size: .9rem; }
 .tip-cat { margin-bottom: 1.4rem; }
-.tip-cat h4 { color: var(--red); font-size: 1.05rem; margin-bottom: .5rem; }
+.tip-cat h4 { color: var(--ink); font-size: 1.05rem; margin-bottom: .5rem; }
 .tip-cat ul { margin: 0; padding-left: 1.15rem; }
 .tip-cat li { margin-bottom: .45rem; }
 .banner { background: #fff8e6; border: 1px solid #f2d488; color: #8a5a00; border-radius: var(--r-sm); padding: .85rem 1rem; font-size: .87rem; margin-bottom: 1.2rem; }
@@ -1609,3 +1612,35 @@ body.logged-in .guest-only { display: none; }
 .mnt-article .article-maint{padding:.4rem 1rem 1rem;border-top:1px solid var(--line)}
 .mnt-article .article-maint img{max-width:100%;height:auto}
 .mnt-article .article-maint p{margin:.5rem 0}
+
+/* ---- Nov-2026 enhancements ---- */
+/* password hint + auto/manual temp-password toggle (staff create user) */
+.pw-hint { color: var(--muted); font-size: .72rem; margin: .3rem 0 0; }
+.pw-field { display: flex; flex-direction: column; gap: .35rem; }
+.pw-field-label { font-weight: 600; font-size: .85rem; }
+.pw-mode { display: flex; gap: 1.1rem; flex-wrap: wrap; }
+.pw-mode .checkbox { font-weight: 500; }
+.pw-auto { display: flex; gap: .4rem; align-items: stretch; }
+.pw-auto input { flex: 1 1 auto; min-width: 0; font-family: ui-monospace, Menlo, monospace; letter-spacing: 1px; font-weight: 600; }
+.pw-copied { color: #16a34a; font-size: .72rem; margin: .2rem 0 0; }
+/* "Other…" spec text input shown when a motor/battery dropdown picks Other */
+.spec-other { margin-top: .35rem; }
+/* star rating (customer review) */
+.stars { display: inline-flex; gap: .15rem; font-size: 1.35rem; line-height: 1; }
+.stars .star { cursor: pointer; color: #d6d8de; background: none; border: 0; padding: 0; transition: color .12s var(--ease), transform .12s var(--ease); }
+.stars .star.on { color: #f5b301; }
+.stars .star:hover { transform: scale(1.15); }
+.stars.ro .star { cursor: default; font-size: 1.05rem; }
+.review-box { border: 1px solid var(--line); border-radius: var(--r); padding: .75rem .9rem; margin-top: .6rem; background: var(--mist); }
+.review-box h5 { margin: 0 0 .4rem; font-size: .9rem; }
+.review-done { color: #16a34a; font-weight: 600; font-size: .82rem; }
+.review-ro { margin-top: .5rem; }
+.review-ro .r-cmt { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
+/* export menu (reports) */
+.export-wrap { position: relative; display: inline-block; }
+.export-menu { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); padding: .35rem; min-width: 150px; z-index: 40; }
+.export-menu button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: .5rem .65rem; border-radius: var(--r-sm); cursor: pointer; font: inherit; }
+.export-menu button:hover { background: var(--accent-soft); color: var(--accent-dark); }
+/* reviews board (admin) */
+.reviews-filters { display: flex; gap: .8rem; flex-wrap: wrap; align-items: end; margin-bottom: .9rem; }
+.rev-stars { color: #f5b301; white-space: nowrap; }

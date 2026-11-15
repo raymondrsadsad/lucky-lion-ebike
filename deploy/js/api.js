@@ -44,7 +44,8 @@ const API = (() => {
   const repToApp = (r) => r && ({
     id: r.id, userId: r.user_id, modelId: r.model_id, date: r.date,
     timeSlot: r.time_slot, status: r.status, notes: r.notes,
-    repairType: r.repair_type, cost: r.cost, completedAt: r.completed_at, branch: r.branch
+    repairType: r.repair_type, cost: r.cost, completedAt: r.completed_at, branch: r.branch,
+    handledBy: r.handled_by, rating: r.rating, review: r.review, reviewedAt: r.reviewed_at
   });
   const msgToApp = (r) => r && ({ id: r.id, userId: r.user_id, sender: r.sender, body: r.body, read: r.read, createdAt: r.created_at });
 
@@ -248,8 +249,22 @@ const API = (() => {
       if ('notes' in patch) row.notes = patch.notes;
       if ('date' in patch) row.date = patch.date;
       if ('timeSlot' in patch) row.time_slot = patch.timeSlot;
-      const updated = await req(`/repairs?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+      if ('handledBy' in patch) row.handled_by = patch.handledBy;   // who performed the repair
+      const url = `/repairs?id=eq.${encodeURIComponent(id)}`;
+      let updated;
+      try { updated = await req(url, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) }); }
+      catch (e) {   // handled_by may not exist yet (enhancements-2026-11.sql not run) → retry without it
+        delete row.handled_by;
+        updated = await req(url, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) });
+      }
       return repToApp(updated[0]);
+    },
+    // Customer rates a completed repair (1–5 stars + comment). Retry-safe if the columns are absent.
+    async submitReview(id, { rating, review }) {
+      const body = { rating: rating != null ? Number(rating) : null, review: review || '', reviewed_at: new Date().toISOString() };
+      const url = `/repairs?id=eq.${encodeURIComponent(id)}`;
+      try { const u = await req(url, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) }); return repToApp(u[0]); }
+      catch (e) { throw new Error('Reviews need the enhancements-2026-11 SQL to be run.'); }
     },
     async deleteRepair(id) {
       await req(`/repairs?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });

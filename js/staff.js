@@ -6,6 +6,106 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<':
 // nt(): escape + wrap a proper noun (branch / model / brand name) so Google Translate won't mangle it
 const nt = (s) => `<span translate="no">${esc(s)}</span>`;
 
+/* ---------- password policy (≥8 chars, ≥1 uppercase, ≥1 number) ---------- */
+function validatePassword(pw) {
+  pw = String(pw || '');
+  if (pw.length < 8) return 'Password must be at least 8 characters.';
+  if (!/[A-Z]/.test(pw)) return 'Password needs at least one uppercase letter.';
+  if (!/\d/.test(pw)) return 'Password needs at least one number.';
+  return null;
+}
+// generate a policy-compliant temporary password (avoids look-alike chars)
+function genPassword() {
+  const U = 'ABCDEFGHJKLMNPQRSTUVWXYZ', L = 'abcdefghijkmnpqrstuvwxyz', D = '23456789', ALL = U + L + D;
+  const pick = s => s[Math.floor(Math.random() * s.length)];
+  let p = [pick(U), pick(D), pick(L), pick(L)];
+  while (p.length < 10) p.push(pick(ALL));
+  for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[p[i], p[j]] = [p[j], p[i]]; }
+  return p.join('');
+}
+
+/* ---------- #11: motor-watts / battery dropdowns (common values + "Other…") ---------- */
+const MOTOR_W_OPTIONS = [500, 650, 800, 1000, 1200, 1500, 2000, 2500];
+const BATTERY_OPTIONS = ['48V/20AH Lead Acid', '60V/20AH Lead Acid', '60V/30AH Lead Acid', '60V/32AH Lead Acid', '60V/45AH Lead Acid', '60V/65AH Lead Acid'];
+// a <select> of common values + an "Other…" option that reveals a free-text input named "<name>Other"
+function specSelect(name, options, current, numeric) {
+  const cur = current == null ? '' : String(current);
+  const inList = cur !== '' && options.map(String).includes(cur);
+  const isOther = cur !== '' && !inList;
+  const opts = options.map(o => `<option value="${esc(String(o))}"${String(o) === cur ? ' selected' : ''}>${esc(String(o))}${numeric ? 'W' : ''}</option>`).join('');
+  return `<select class="spec-select" name="${esc(name)}">
+      <option value=""${cur === '' ? ' selected' : ''}>— choose —</option>
+      ${opts}
+      <option value="__other__"${isOther ? ' selected' : ''}>Other…</option>
+    </select>
+    <input class="spec-other${isOther ? '' : ' hidden'}" name="${esc(name)}Other" value="${isOther ? esc(cur) : ''}" placeholder="${numeric ? 'Type watts (number)' : 'Type battery spec'}" />`;
+}
+// read a spec value out of a form element: the <select> value, or the "Other" text when "__other__"
+function readSpec(el, name) {
+  const sel = el.querySelector(`[name="${name}"]`);
+  if (!sel) return '';
+  if (sel.value === '__other__') { const o = el.querySelector(`[name="${name}Other"]`); return o ? o.value.trim() : ''; }
+  return sel.value;
+}
+// delegated (wired once): show/hide the "Other" input as a spec <select> changes
+function wireSpecSelects() {
+  document.addEventListener('change', e => {
+    const sel = e.target.closest && e.target.closest('.spec-select'); if (!sel) return;
+    const other = sel.parentElement && sel.parentElement.querySelector('.spec-other'); if (!other) return;
+    const show = sel.value === '__other__';
+    other.classList.toggle('hidden', !show);
+    if (show) other.focus();
+  });
+}
+
+/* ---------- #8: report export (Excel / PDF) ---------- */
+let REG_VIEW = [], REP_EXPORT_ROWS = [];
+// columns: [{key,label}]; rows: array of objects; fmt: 'xlsx' | 'pdf'
+function exportRows(title, columns, rows, fmt) {
+  const header = columns.map(c => c.label);
+  const data = rows.map(r => columns.map(c => { const v = r[c.key]; return v == null ? '' : String(v); }));
+  const stamp = new Date().toISOString().slice(0, 10);
+  const fname = `${String(title).replace(/\s+/g, '-').toLowerCase()}-${stamp}`;
+  if (fmt === 'xlsx') {
+    if (!window.XLSX) { toast('Excel library not loaded — check your connection.'); return; }
+    const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, String(title).slice(0, 28) || 'Sheet1');
+    XLSX.writeFile(wb, fname + '.xlsx');
+  } else {
+    const jsPDF = window.jspdf && window.jspdf.jsPDF;
+    if (!jsPDF) { toast('PDF library not loaded — check your connection.'); return; }
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14); doc.text(String(title), 14, 15);
+    doc.setFontSize(9); doc.text(`Generated ${stamp} · ${rows.length} row(s)`, 14, 21);
+    doc.autoTable({ head: [header], body: data, startY: 25, styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: [225, 27, 34] } });
+    doc.save(fname + '.pdf');
+  }
+}
+// markup for an "⬇ Export" button + Excel/PDF menu
+function exportControl(id) {
+  return `<div class="export-wrap">
+    <button type="button" class="btn btn-ghost btn-sm" id="${id}Btn">⬇ Export</button>
+    <div class="export-menu hidden" id="${id}Menu">
+      <button type="button" data-fmt="xlsx">Excel (.xlsx)</button>
+      <button type="button" data-fmt="pdf">PDF</button>
+    </div>
+  </div>`;
+}
+// wire an export control; getData() → { title, columns, rows }
+function wireExport(id, getData) {
+  const btn = $(`#${id}Btn`), menu = $(`#${id}Menu`); if (!btn || !menu) return;
+  btn.addEventListener('click', e => { e.stopPropagation(); menu.classList.toggle('hidden'); });
+  menu.addEventListener('click', e => {
+    const b = e.target.closest('button[data-fmt]'); if (!b) return;
+    menu.classList.add('hidden');
+    const { title, columns, rows } = getData();
+    if (!rows || !rows.length) { toast('Nothing to export.'); return; }
+    exportRows(title, columns, rows, b.dataset.fmt);
+  });
+  document.addEventListener('click', () => menu.classList.add('hidden'));
+}
+
 /* ---------- #1: red asterisk on required fields (observer-driven) ---------- */
 function markRequired(root = document) {
   root.querySelectorAll('label').forEach(label => {
@@ -159,7 +259,7 @@ const myBranch = () => (ME && ME.branch) || null;
 const userById = (id) => REP_USERS[id];
 const branchOfUser = (id) => { const u = REP_USERS[id]; return u ? u.branch : null; };
 // admin-only views (staff cannot open these; their drawer links are hidden too)
-const ADMIN_ONLY_VIEWS = ['analytics', 'models', 'photos', 'settings'];
+const ADMIN_ONLY_VIEWS = ['analytics', 'reviews', 'models', 'photos', 'settings'];
 // which branch an oversight view is currently showing. null = all (admin default); staff = own branch.
 let VIEW_BRANCH = null;
 
@@ -187,6 +287,7 @@ async function init() {
   const staffMenuName = $('#staffMenuName'); if (staffMenuName) staffMenuName.textContent = roleWord;
   $('#staffName').textContent = `Signed in as ${me.name || me.username}`;
   wireColorFields();   // delegated colour-picker behaviour for variants + unit forms
+  wireSpecSelects();   // #11: motor/battery dropdown "Other…" toggling
   // user/unit actions (delegated; survives re-renders)
   $('#usersList').addEventListener('click', async e => {
     const delU = e.target.closest('.del-user');
@@ -288,10 +389,11 @@ function forceStaffPasswordChange(me) {
     <h3 class="modal-title">🔒 Set a new password</h3>
     <p class="modal-note">Your account uses a temporary password. Please choose a new one to continue.</p>
     <form class="form" id="forcePwForm">
-      <label>New password <input name="next" type="password" required minlength="4" autocomplete="new-password" /></label>
-      <label>Confirm new password <input name="confirm" type="password" required minlength="4" autocomplete="new-password" /></label>
+      <label>New password <input name="next" type="password" required minlength="8" pattern="(?=.*[A-Z])(?=.*\\d).{8,}" title="At least 8 characters, with one uppercase letter and one number." autocomplete="new-password" /></label>
+      <p class="pw-hint">At least 8 characters, 1 uppercase letter and 1 number.</p>
+      <label>Confirm new password <input name="confirm" type="password" required minlength="8" autocomplete="new-password" /></label>
       <p class="form-error hidden" id="forcePwErr"></p>
-      <button class="btn btn-primary full" type="submit">Save new password</button>
+      <button class="btn btn-success full" type="submit">Save new password</button>
     </form></div>`;
   document.body.appendChild(host);
   document.body.style.overflow = 'hidden';
@@ -299,6 +401,8 @@ function forceStaffPasswordChange(me) {
   host.querySelector('#forcePwForm').addEventListener('submit', async e => {
     e.preventDefault(); err.classList.add('hidden');
     const f = new FormData(e.target);
+    const pwErr = validatePassword(f.get('next'));
+    if (pwErr) { err.textContent = pwErr; err.classList.remove('hidden'); return; }
     if (f.get('next') !== f.get('confirm')) { err.textContent = 'The passwords do not match.'; err.classList.remove('hidden'); return; }
     try { await API.setNewPassword(me.id, f.get('next')); location.reload(); }
     catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
@@ -307,7 +411,7 @@ function forceStaffPasswordChange(me) {
 
 /* ================= SIDE DRAWER + VIEW ROUTER =================
    One section is visible at a time; the burger opens a grouped menu. */
-const VIEWS = ['dashboard', 'analytics', 'users', 'create', 'repairs', 'inbox', 'registry', 'models', 'photos', 'poster', 'settings'];
+const VIEWS = ['dashboard', 'analytics', 'reviews', 'users', 'create', 'repairs', 'inbox', 'registry', 'models', 'photos', 'poster', 'settings'];
 const viewFromHash = () => {
   const h = (location.hash || '').replace('#', '');
   return VIEWS.includes(h) ? h : 'dashboard';
@@ -325,6 +429,7 @@ function showView(view, push = true) {
   if (view !== 'inbox') { clearInterval(INBOX_POLL); INBOX_POLL = null; }
   if (view === 'dashboard') renderDashboard();
   if (view === 'analytics') renderAnalytics();
+  if (view === 'reviews') renderReviews();
   if (view === 'registry') renderRegistry();
   if (view === 'inbox') renderInbox();
   window.scrollTo({ top: 0, behavior: 'auto' });
@@ -836,6 +941,65 @@ async function renderAnalytics() {
   wireBranchTableNav('#analyticsBody');   // each column routes to its own page, scoped to that branch
 }
 
+/* ================= #9: CUSTOMER REVIEWS (admin) ================= */
+let REV_ROWS = [], REV_BRANCH = '', REV_SORT = 'newest';
+async function renderReviews() {
+  const host = $('#reviewsBody'); if (!host) return;
+  host.innerHTML = '<p class="b-meta">Loading reviews…</p>';
+  let reps = [], users = {};
+  try {
+    reps = await API.getRepairs();
+    (await API.getUsers()).forEach(u => { users[u.id] = u; });
+  } catch (ex) { host.innerHTML = `<p class="form-error">Couldn't load reviews: ${esc(ex.message)}</p>`; return; }
+  REV_ROWS = reps.filter(r => r.rating).map(r => {
+    const u = users[r.userId], m = STORE.modelById(r.modelId);
+    return {
+      when: r.reviewedAt || r.completedAt || r.date, rating: Number(r.rating) || 0, review: r.review || '',
+      owner: u ? (u.name || u.username) : r.userId, branch: r.branch || (u && u.branch) || '', model: m ? m.name : r.modelId
+    };
+  });
+  host.innerHTML = `
+    <div class="reviews-filters">
+      <label>Branch <select id="revBranch">${branchOptionsHtml(REV_BRANCH, { all: true, allLabel: 'All branches' })}</select></label>
+      <label>Sort <select id="revSort">
+        <option value="newest"${REV_SORT === 'newest' ? ' selected' : ''}>Newest first</option>
+        <option value="oldest"${REV_SORT === 'oldest' ? ' selected' : ''}>Oldest first</option>
+        <option value="high"${REV_SORT === 'high' ? ' selected' : ''}>Highest rating</option>
+        <option value="low"${REV_SORT === 'low' ? ' selected' : ''}>Lowest rating</option>
+      </select></label>
+    </div>
+    <div id="revTable"></div>`;
+  $('#revBranch').addEventListener('change', e => { REV_BRANCH = e.target.value === 'all' ? '' : e.target.value; paintReviews(); });
+  $('#revSort').addEventListener('change', e => { REV_SORT = e.target.value; paintReviews(); });
+  paintReviews();
+}
+function paintReviews() {
+  const host = $('#revTable'); if (!host) return;
+  let rows = REV_ROWS.slice();
+  if (REV_BRANCH) rows = rows.filter(r => r.branch === REV_BRANCH);
+  const cmp = {
+    newest: (a, b) => String(b.when || '').localeCompare(String(a.when || '')),
+    oldest: (a, b) => String(a.when || '').localeCompare(String(b.when || '')),
+    high: (a, b) => b.rating - a.rating, low: (a, b) => a.rating - b.rating
+  }[REV_SORT] || (() => 0);
+  rows.sort(cmp);
+  if (!rows.length) { host.innerHTML = '<p class="b-meta">No reviews yet for this selection.</p>'; return; }
+  const avg = (REV_ROWS.reduce((s, r) => s + r.rating, 0) / REV_ROWS.length).toFixed(1);
+  host.innerHTML = `
+    <p class="b-meta">${REV_ROWS.length} review(s) · average ${avg}★</p>
+    <div class="table-scroll"><table class="reg-table admin-table">
+      <thead><tr><th>Date</th><th>Branch</th><th>Customer</th><th>Model</th><th>Rating</th><th>Comment</th></tr></thead>
+      <tbody>${rows.map(r => `<tr>
+        <td data-label="Date">${esc(niceDate(r.when))}</td>
+        <td data-label="Branch">${r.branch ? nt(branchShort(r.branch)) : '—'}</td>
+        <td data-label="Customer">${nt(r.owner)}</td>
+        <td data-label="Model">${nt(r.model)}</td>
+        <td data-label="Rating"><span class="rev-stars" title="${r.rating}/5">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span></td>
+        <td data-label="Comment">${r.review ? esc(r.review) : '—'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
 /* ================= POSTER MAKER ================= */
 async function initPoster() {
   const form = $('#posterForm'), modelSel = $('#posterModel'), tmplSel = $('#posterTemplate');
@@ -1155,8 +1319,8 @@ function variantEditor(modelId, v) {
     <form class="form var-edit" data-id="${esc(v.id)}">
       <div class="var-add-row">
         ${colorLabelField(v.name, v.color_hex, true)}
-        <button class="btn btn-primary btn-sm" type="submit">Save</button>
-        <button class="btn btn-ghost btn-sm var-del" type="button" data-id="${esc(v.id)}" data-model="${esc(modelId)}" title="Delete colour">Delete</button>
+        <button class="btn btn-success btn-sm" type="submit">Save</button>
+        <button class="btn btn-ghost btn-sm danger var-del" type="button" data-id="${esc(v.id)}" data-model="${esc(modelId)}" title="Delete colour">Delete</button>
       </div>
     </form>
     <div class="var-photos">
@@ -1263,8 +1427,8 @@ function modelRow(r, first, last) {
             <label>Name <input name="mname" value="${esc(e.name)}" /></label>
             <label>Type <select name="wheels">${wheelOpts}</select></label>
             <div class="grid3">
-              <label>Motor (Watts) <input name="motor_w" type="number" value="${numOrEmpty(e.motorW)}" /></label>
-              <label>Battery <input name="battery" value="${esc(e.battery || '')}" /></label>
+              <label>Motor (Watts) ${specSelect('motor_w', MOTOR_W_OPTIONS, e.motorW, true)}</label>
+              <label>Battery ${specSelect('battery', BATTERY_OPTIONS, e.battery, false)}</label>
               <label>Brakes <input name="brakes" value="${esc(e.brakes || '')}" /></label>
             </div>
           </div>
@@ -1278,7 +1442,7 @@ function modelRow(r, first, last) {
         </details>
 
         <div class="row-actions">
-          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-success btn-sm" type="submit">Save</button>
           ${r.custom
       ? `<button class="btn btn-ghost btn-sm del-model danger" type="button" data-id="${esc(b.id)}" data-name="${esc(e.name)}">Delete model</button>`
       : `<button class="btn btn-ghost btn-sm remove-model danger" type="button" data-id="${esc(b.id)}" data-name="${esc(e.name)}">Delete</button>`}
@@ -1555,7 +1719,7 @@ function wireModelForms(root = '#modelsList') {
       const str = v => { v = (v || '').toString().trim(); return v === '' ? null : v; };
       const patch = {
         name: str(el.mname.value), wheels: el.wheels.value || null,
-        motor_w: num(el.motor_w.value), battery: str(el.battery.value), brakes: str(el.brakes.value),
+        motor_w: num(readSpec(el, 'motor_w')), battery: str(readSpec(el, 'battery')), brakes: str(el.brakes.value),
         srp: num(el.srp.value)
       };
       const ok = el.querySelector('.form-ok');
@@ -1593,8 +1757,8 @@ function wireAddModel() {
     btn.disabled = true;
     try {
       await API.upsertModelMeta(id, {
-        name: f.get('name'), wheels: f.get('wheels'), motor_w: Number(f.get('motor_w') || 0),
-        battery: f.get('battery'), brakes: f.get('brakes'), srp: Number(f.get('srp') || 0),
+        name: f.get('name'), wheels: f.get('wheels'), motor_w: Number(readSpec(e.target, 'motor_w') || 0),
+        battery: readSpec(e.target, 'battery'), brakes: f.get('brakes'), srp: Number(f.get('srp') || 0),
         is_custom: true
       });
       // upload the staged photos in the chosen order (first = main card image)
@@ -1663,6 +1827,7 @@ async function renderRegistry() {
               <option value="owner">Owner A–Z</option>
             </select>
           </label>
+          ${exportControl('regExport')}
         </div>
       </div>
     </div>
@@ -1672,6 +1837,18 @@ async function renderRegistry() {
   if (regBranch) regBranch.addEventListener('change', () => { REG_BRANCH = regBranch.value || 'all'; paintRegistry(); });
   const sortSel = $('#regSort'); sortSel.value = REG_SORT;
   sortSel.addEventListener('change', () => { REG_SORT = sortSel.value; paintRegistry(); });
+  wireExport('regExport', () => ({
+    title: 'E-Bike Registry',
+    columns: [{ key: 'owner', label: 'Owner' }, { key: 'memberId', label: 'Member ID' }, { key: 'branch', label: 'Branch' },
+      { key: 'phone', label: 'Phone' }, { key: 'model', label: 'Model' }, { key: 'wheels', label: 'Wheels' },
+      { key: 'colour', label: 'Colour' }, { key: 'chassis', label: 'Chassis no.' }, { key: 'motor', label: 'Motor no.' },
+      { key: 'battery', label: 'Battery no.' }, { key: 'acquired', label: 'Acquired' }],
+    rows: (REG_VIEW || []).map(r => ({
+      owner: r.owner, memberId: r.memberId, branch: r.branch ? branchShort(r.branch) : '', phone: r.phone,
+      model: r.model, wheels: wheelLabelOf(r.wheels), colour: r.colour,
+      chassis: r.e.chassis_no || '', motor: r.e.motor_no || '', battery: r.e.battery_no || '', acquired: r.acquired
+    }))
+  }));
   $$('#regChips .chip').forEach(b => b.addEventListener('click', () => {
     REG_WHEEL = b.dataset.wheel;
     $$('#regChips .chip').forEach(x => x.classList.toggle('is-active', x === b));
@@ -1692,6 +1869,7 @@ function paintRegistry() {
   if (REG_SORT === 'acquired-desc') rows.sort((a, b) => (b.acquired || '').localeCompare(a.acquired || ''));
   else if (REG_SORT === 'acquired-asc') rows.sort((a, b) => (a.acquired || '').localeCompare(b.acquired || ''));
   else if (REG_SORT === 'owner') rows.sort((a, b) => a.owner.localeCompare(b.owner));
+  REG_VIEW = rows;   // #8: remember the filtered/sorted rows so Export matches what's shown
 
   const tr = rows.map(r => `<tr>
       <td data-label="Owner"><strong>${nt(r.owner)}</strong>${r.memberId ? ` <span class="reg-mid">${esc(r.memberId)}</span>` : ''}${r.phone ? `<div class="reg-sub"><a href="tel:${esc(r.phone)}">📞 ${esc(r.phone)}</a></div>` : ''}</td>
@@ -1776,7 +1954,13 @@ function wireStaffNotifications() {
     if (show) markStaffNotifSeen();
   });
   document.addEventListener('click', e => { if (!e.target.closest('.notif')) panel.classList.add('hidden'); });
-  $('#notifList').addEventListener('click', e => { if (e.target.closest('.notif-item')) { panel.classList.add('hidden'); showView('repairs'); } });
+  $('#notifList').addEventListener('click', e => {
+    const item = e.target.closest('.notif-item'); if (!item) return;
+    panel.classList.add('hidden');
+    const uid = item.dataset.user;
+    if (uid) { INBOX_OPEN = uid; showView('inbox'); }   // message notification → open that thread
+    else showView('repairs');                            // repair notification → repairs list
+  });
 }
 async function refreshStaffNotifications() {
   let reps = [], users = {};
@@ -1787,25 +1971,36 @@ async function refreshStaffNotifications() {
   let seen = {};
   try { seen = JSON.parse(localStorage.getItem(staffNotifKey()) || '{}') || {}; } catch { }
   const nameOf = id => { const u = users[id]; return u ? (u.name || u.username) : 'A customer'; };
-  const items = [];
-  reps.forEach(r => {
-    const sig = `${r.status}|${r.date}|${r.timeSlot || ''}`;
-    if (!(r.id in seen)) {
-      if (r.status !== 'done' && r.status !== 'cancelled') items.push({ text: `New booking from ${nameOf(r.userId)} on ${r.date || '—'}.` });
-    } else if (seen[r.id] !== sig) {
-      items.push({ text: `${nameOf(r.userId)}'s repair changed — now “${r.status}”.` });
-    }
-  });
-  STAFF_NOTIF = items;
   const firstRun = !localStorage.getItem(staffNotifKey());
-  if (firstRun) { seedStaffNotif(reps); STAFF_NOTIF = []; }
+  // --- new/changed repair bookings (snapshot diff, dismissed when the bell is opened) ---
+  const repItems = [];
+  if (!firstRun) {
+    reps.forEach(r => {
+      const sig = `${r.status}|${r.date}|${r.timeSlot || ''}`;
+      if (!(r.id in seen)) {
+        if (r.status !== 'done' && r.status !== 'cancelled') repItems.push({ type: 'repair', text: `New booking from ${nameOf(r.userId)} on ${r.date || '—'}.` });
+      } else if (seen[r.id] !== sig) {
+        repItems.push({ type: 'repair', text: `${nameOf(r.userId)}'s repair changed — now “${r.status}”.` });
+      }
+    });
+  } else { seedStaffNotif(reps); }
+  // --- unread customer messages (persist in the bell until the thread is actually read) ---
+  const msgItems = [];
+  try {
+    const unread = (await API.getAllMessages()).filter(m => m.sender === 'customer' && !m.read);
+    const scoped = isAdmin() ? unread : unread.filter(m => { const b = (users[m.userId] || {}).branch; return b === myBranch() || !b; });
+    const perUser = {};
+    scoped.forEach(m => { perUser[m.userId] = (perUser[m.userId] || 0) + 1; });
+    Object.keys(perUser).forEach(uid => msgItems.push({ type: 'message', userId: uid, text: `New message from ${nameOf(uid)}${perUser[uid] > 1 ? ` (${perUser[uid]})` : ''}.` }));
+  } catch { }
+  STAFF_NOTIF = repItems.concat(msgItems);
   paintStaffNotif();
 }
 function paintStaffNotif() {
   const list = $('#notifList'), dot = $('#notifDot');
   if (!list) return;
   if (!STAFF_NOTIF.length) { list.innerHTML = `<p class="notif-empty">You're all caught up.</p>`; if (dot) dot.classList.add('hidden'); return; }
-  list.innerHTML = STAFF_NOTIF.map(i => `<button type="button" class="notif-item">🔔 ${esc(i.text)}</button>`).join('');
+  list.innerHTML = STAFF_NOTIF.map(i => `<button type="button" class="notif-item"${i.userId ? ` data-user="${esc(i.userId)}"` : ''}>${i.type === 'message' ? '💬' : '🔔'} ${esc(i.text)}</button>`).join('');
   if (dot) { dot.textContent = STAFF_NOTIF.length > 9 ? '9+' : String(STAFF_NOTIF.length); dot.classList.remove('hidden'); }
 }
 function seedStaffNotif(reps) {
@@ -1818,7 +2013,14 @@ async function markStaffNotifSeen() {
   try { (await API.getUsers()).forEach(u => users[u.id] = u); } catch { }
   const inScope = r => isAdmin() || ((r.branch || (users[r.userId] || {}).branch) === myBranch());
   seedStaffNotif(reps.filter(inScope));
-  STAFF_NOTIF = []; const dot = $('#notifDot'); if (dot) dot.classList.add('hidden');
+  // opening the bell dismisses the repair notifications, but unread-message ones stay
+  // (they clear only when the thread is actually opened/read in the inbox)
+  STAFF_NOTIF = STAFF_NOTIF.filter(i => i.type === 'message');
+  const dot = $('#notifDot');
+  if (dot) {
+    if (STAFF_NOTIF.length) { dot.textContent = STAFF_NOTIF.length > 9 ? '9+' : String(STAFF_NOTIF.length); dot.classList.remove('hidden'); }
+    else dot.classList.add('hidden');
+  }
 }
 // two-pane inbox: thread list on the left, the open conversation on the right
 let INBOX_THREADS = [], INBOX_BRANCH = null;
@@ -1912,7 +2114,7 @@ async function paintConversation() {
   renderChat($('#convList'), msgs, 'staff');
   const cl = $('#convList'); cl.scrollTop = cl.scrollHeight;
   // Only branch staff clear the unread flag (admin monitoring must not mark it seen).
-  if (!readOnly) { try { await API.markMessagesRead(userId, 'customer'); updateInboxBadgeCount(); markThreadReadLocal(userId); } catch { } }
+  if (!readOnly) { try { await API.markMessagesRead(userId, 'customer'); updateInboxBadgeCount(); refreshStaffNotifications(); markThreadReadLocal(userId); } catch { } }
   $('#convBack').addEventListener('click', () => {
     INBOX_OPEN = null; clearInterval(INBOX_POLL); INBOX_POLL = null;
     const wrap = $('#inboxWrap'); if (wrap) wrap.classList.remove('has-open');
@@ -1943,7 +2145,7 @@ async function refreshConversation(userId) {
   let msgs = []; try { msgs = await API.getMessages(userId); } catch { return; }
   renderChat(cl, msgs, 'staff');
   cl.scrollTop = cl.scrollHeight;
-  if (!isAdmin()) { try { await API.markMessagesRead(userId, 'customer'); updateInboxBadgeCount(); } catch { } }
+  if (!isAdmin()) { try { await API.markMessagesRead(userId, 'customer'); updateInboxBadgeCount(); refreshStaffNotifications(); } catch { } }
 }
 
 // Customer detail popup — opened from the inbox (and reusable elsewhere):
@@ -2211,7 +2413,7 @@ function unitRow(e, canEdit = true) {
       </div>
       <label>Acquired <input name="acquiredAt" type="date" value="${esc(e.acquired_at || '')}" /></label>
       <label>Sale note (staff only) <input name="saleNote" value="${esc(e.sale_note || '')}" placeholder="e.g. discount, 6-month Home Credit" /></label>
-      <div class="row-actions"><button class="btn btn-primary btn-sm" type="submit">Save unit</button></div>
+      <div class="row-actions"><button class="btn btn-success btn-sm" type="submit">Save unit</button></div>
     </form>` : ''}
   </div>`;
 }
@@ -2257,7 +2459,7 @@ function custRow(u, canEdit = true) {
           <button class="btn btn-ghost btn-sm add-ebike" data-user="${esc(u.id)}">Add unit</button>
         </div>` : ''}
       </div>
-      ${canEdit ? `<button class="btn btn-ghost btn-sm del-user" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}" style="margin-top:.7rem">Delete user</button>` : '<div class="b-meta" style="color:var(--muted);margin-top:.5rem">👁 View only — this customer belongs to another branch.</div>'}
+      ${canEdit ? `<button class="btn btn-ghost btn-sm danger del-user" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}" style="margin-top:.7rem">Delete user</button>` : '<div class="b-meta" style="color:var(--muted);margin-top:.5rem">👁 View only — this customer belongs to another branch.</div>'}
     </div>
   </details>`;
 }
@@ -2274,7 +2476,7 @@ function staffRow(u) {
         ${isMe ? '<div class="b-meta" style="color:var(--muted)">— this is you —</div>' : ''}
       </div>
     </div>
-    ${isMe ? '' : `<button class="btn btn-ghost btn-sm del-user" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}">Delete</button>`}
+    ${isMe ? '' : `<button class="btn btn-ghost btn-sm danger del-user" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}">Delete</button>`}
   </div>`;
 }
 
@@ -2365,6 +2567,7 @@ function paintRepairs() {
         <button type="button" class="vt-btn ${cal ? '' : 'is-active'}" data-view="list">📋 List</button>
         <button type="button" class="vt-btn ${cal ? 'is-active' : ''}" data-view="calendar">📅 Calendar</button>
       </div>
+      ${exportControl('repExport')}
     </div>
     ${cal ? '' : `<div class="seg" role="tablist">
       <button class="seg-btn ${REP_TAB === 'scheduled' ? 'is-active' : ''}" data-tab="scheduled" role="tab">Scheduled <span class="seg-count">${scheduled}</span></button>
@@ -2387,6 +2590,26 @@ function paintRepairs() {
   if (s) s.addEventListener('input', e => { REP_QUERY = e.target.value; paintRepairRows(); });
   const hsel = $('#repHistSort');
   if (hsel) hsel.addEventListener('change', e => { REP_HIST_SORT = e.target.value; paintRepairRows(); });
+  wireExport('repExport', () => {
+    const br = (REP_BRANCH && REP_BRANCH !== 'all') ? REP_BRANCH : null;
+    const rows = REPAIRS.filter(r => !br || (r.branch || branchOfUser(r.userId)) === br).map(r => {
+      const u = REP_USERS[r.userId], m = STORE.modelById(r.modelId);
+      return {
+        customer: u ? (u.name || u.username) : r.userId, memberId: u ? (u.memberId || '') : '',
+        branch: (() => { const b = r.branch || branchOfUser(r.userId); return b ? branchShort(b) : ''; })(),
+        model: m ? m.name : r.modelId, service: r.repairType || '', date: r.date || '', slot: r.timeSlot || '',
+        status: r.status || '', handledBy: r.handledBy || '', charge: (r.cost != null && r.cost !== '') ? r.cost : '',
+        rating: r.rating || '', review: r.review || '', notes: r.notes || ''
+      };
+    });
+    return {
+      title: 'Scheduled Repairs', rows,
+      columns: [{ key: 'customer', label: 'Customer' }, { key: 'memberId', label: 'Member ID' }, { key: 'branch', label: 'Branch' },
+        { key: 'model', label: 'Model' }, { key: 'service', label: 'Service' }, { key: 'date', label: 'Date' },
+        { key: 'slot', label: 'Time slot' }, { key: 'status', label: 'Status' }, { key: 'handledBy', label: 'Handled by' },
+        { key: 'charge', label: 'Charge (₱)' }, { key: 'rating', label: 'Rating' }, { key: 'review', label: 'Review' }, { key: 'notes', label: 'Notes' }]
+    };
+  });
   paintRepairRows();
 }
 
@@ -2401,8 +2624,10 @@ function repContact(u) {
 
 function repMeta(r) {
   return `${r.repairType ? `<div class="b-meta">🔧 ${esc(r.repairType)}</div>` : ''}
+    ${r.handledBy ? `<div class="b-meta">🧑‍🔧 Handled by ${esc(r.handledBy)}</div>` : ''}
     ${r.cost != null && r.cost !== '' ? `<div class="b-meta">💵 ${peso(r.cost)}</div>` : ''}
-    ${r.notes ? `<div class="b-meta">📝 ${esc(r.notes)}</div>` : ''}`;
+    ${r.notes ? `<div class="b-meta">📝 ${esc(r.notes)}</div>` : ''}
+    ${r.rating ? `<div class="b-meta">⭐ Customer rated ${esc(r.rating)}/5${r.review ? ` — &ldquo;${esc(r.review)}&rdquo;` : ''}</div>` : ''}`;
 }
 
 // the specific owned unit this repair is for (first match on model), + its colour/serials
@@ -2447,7 +2672,7 @@ function scheduledRow(r) {
       <button class="btn btn-ghost btn-sm rep-edit" data-id="${esc(r.id)}">Edit</button>
       <button class="btn btn-ghost btn-sm rep-msg" data-user="${esc(r.userId)}">💬 Message</button>
       <button class="btn btn-primary btn-sm rep-next" data-id="${esc(r.id)}" data-next="${next}">Mark ${next}</button>
-      <button class="btn btn-ghost btn-sm rep-cancel" data-id="${esc(r.id)}">Cancel</button>
+      <button class="btn btn-ghost btn-sm danger rep-cancel" data-id="${esc(r.id)}">Cancel</button>
     </div>` : ''}
   </div>`;
 }
@@ -2470,7 +2695,7 @@ function doneRow(r) {
       <button class="btn btn-ghost btn-sm rep-edit" data-id="${esc(r.id)}">Edit</button>
       <button class="btn btn-ghost btn-sm rep-msg" data-user="${esc(r.userId)}">💬 Message</button>
       <button class="btn btn-ghost btn-sm rep-reopen" data-id="${esc(r.id)}">Re-open</button>
-      <button class="btn btn-ghost btn-sm rep-del" data-id="${esc(r.id)}">Delete</button>
+      <button class="btn btn-ghost btn-sm danger rep-del" data-id="${esc(r.id)}">Delete</button>
     </div>` : ''}
   </div>`;
 }
@@ -2710,9 +2935,10 @@ function openRepairEditor(r) {
       <label>Date <input name="date" type="date" value="${esc(r.date || '')}" min="${today10()}" /></label>
       <label>Time slot <input name="timeSlot" value="${esc(r.timeSlot || '')}" placeholder="e.g. 10:00–12:00" /></label>
       <label>Charge (₱) <input name="cost" type="number" min="0" step="1" value="${r.cost != null ? esc(r.cost) : ''}" /></label>
+      <label>Handled by (who did the repair) <input name="handledBy" value="${esc(r.handledBy || '')}" placeholder="${esc((ME && ME.name) || 'staff name')}" /></label>
       <label>Notes <textarea name="notes" rows="3">${esc(r.notes || '')}</textarea></label>
       <p class="form-error hidden" id="repEditErr"></p>
-      <button class="btn btn-primary" type="submit">Save changes</button>
+      <button class="btn btn-success" type="submit">Save changes</button>
     </form>`;
   $('#panelModal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
   $('#repEditForm').addEventListener('submit', async e => {
@@ -2724,7 +2950,8 @@ function openRepairEditor(r) {
     try {
       await API.updateRepair(r.id, {
         repairType: f.get('repairType') || null, date: f.get('date') || null,
-        timeSlot: f.get('timeSlot') || null, cost: num(f.get('cost')), notes: f.get('notes') || ''
+        timeSlot: f.get('timeSlot') || null, cost: num(f.get('cost')), notes: f.get('notes') || '',
+        handledBy: (f.get('handledBy') || '').trim() || null
       });
       $('#panelModal').classList.add('hidden'); document.body.style.overflow = '';
       await renderRepairs();
@@ -2772,6 +2999,26 @@ function wireCreate() {
   vsel.addEventListener('change', () => autoColour(details, vsel));
   syncBranchField();
 
+  // #2: temporary-password auto-generate / manual toggle
+  const pwAutoInput = $('#createPwAutoInput'), pwAutoWrap = $('#createPwAuto'), pwManual = $('#createPwManual');
+  const regenPw = () => { if (pwAutoInput) pwAutoInput.value = genPassword(); };
+  regenPw();
+  const syncPwMode = () => {
+    const mode = ($('#createForm [name="pwMode"]:checked') || {}).value || 'auto';
+    if (pwAutoWrap) pwAutoWrap.classList.toggle('hidden', mode !== 'auto');
+    if (pwManual) pwManual.classList.toggle('hidden', mode !== 'manual');
+  };
+  $$('#createForm [name="pwMode"]').forEach(r => r.addEventListener('change', syncPwMode));
+  syncPwMode();
+  const regenBtn = $('#createPwRegen'); if (regenBtn) regenBtn.addEventListener('click', regenPw);
+  const copyBtn = $('#createPwCopy');
+  if (copyBtn) copyBtn.addEventListener('click', () => {
+    if (!pwAutoInput || !pwAutoInput.value) return;
+    const done = () => toast('Password copied.');
+    if (navigator.clipboard) navigator.clipboard.writeText(pwAutoInput.value).then(done).catch(() => { pwAutoInput.select(); document.execCommand('copy'); done(); });
+    else { pwAutoInput.select(); document.execCommand('copy'); done(); }
+  });
+
   $('#createForm').addEventListener('submit', async e => {
     e.preventDefault();
     const err = $('#createErr'), ok = $('#createOk');
@@ -2781,11 +3028,16 @@ function wireCreate() {
     const isCust = role === 'customer';
     const branch = role === 'admin' ? null : (!isAdmin() ? myBranch() : (f.get('branch') || ''));
     if (role !== 'admin' && !branch) { err.textContent = 'Please choose a branch.'; err.classList.remove('hidden'); return; }
+    // #2: temp password comes from the auto field or the manual field, and must meet the policy
+    const pwMode = f.get('pwMode') || 'auto';
+    const password = pwMode === 'manual' ? (f.get('passwordManual') || '') : (f.get('passwordAuto') || '');
+    const pwErr = validatePassword(password);
+    if (pwErr) { err.textContent = pwErr; err.classList.remove('hidden'); return; }
     if (!(await confirmAction(`Create this ${role} account?`, { title: 'Create account', confirmLabel: 'Create account' }))) return;
     const modelId = isCust ? (f.get('ownedModelId') || null) : null;
     try {
       const u = await API.createUser({
-        role, branch, name: f.get('name'), username: f.get('username'), password: f.get('password'),
+        role, branch, name: f.get('name'), username: f.get('username'), password,
         phone: f.get('phone'), email: f.get('email'), address: f.get('address'), ownedModelId: modelId
       });
       // record the purchased unit (multi-unit support) with its colour + serials; decrements branch stock
@@ -2800,10 +3052,11 @@ function wireCreate() {
           await loadVariants(); await loadStockMeta();
         } catch { }
       }
-      ok.textContent = `Account created for ${u.name || u.username} (@${u.username}).`;
+      ok.innerHTML = `Account created for ${esc(u.name || u.username)} (@${esc(u.username)}).<br>Temporary password: <strong style="font-family:ui-monospace,Menlo,monospace;letter-spacing:1px">${esc(password)}</strong> — share this with them; they'll change it on first login.`;
       ok.classList.remove('hidden');
       e.target.reset(); details.classList.add('hidden');
       if (createColorSlot) createColorSlot.innerHTML = colorLabelField('', '', false, '— colour —');
+      regenPw(); syncPwMode();   // fresh auto password for the next account
       toast(`Account created for ${u.name || u.username}.`);
       await renderUsers();
     } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
@@ -3010,26 +3263,27 @@ function openStaffProfile(me) {
       ${avatarImg(me, 'avatar-xl')}
       <div class="avatar-edit-actions">
         <button type="button" class="btn btn-ghost btn-sm" id="stAvatarBtn">${me.avatarUrl ? 'Change photo' : 'Add photo'}</button>
-        ${me.avatarUrl ? '<button type="button" class="btn btn-ghost btn-sm" id="stAvatarRemove">Remove</button>' : ''}
+        ${me.avatarUrl ? '<button type="button" class="btn btn-ghost btn-sm danger" id="stAvatarRemove">Remove</button>' : ''}
         <p class="form-error hidden" id="stAvatarErr"></p>
       </div>
     </div>
     <form class="form" id="stProfileForm">
       <label>Full name <input name="name" autocomplete="name" value="${esc(me.name)}" /></label>
-      <label>Email <input name="email" type="email" autocomplete="email" value="${esc(me.email)}" /></label>
-      <label>Phone <input name="phone" autocomplete="tel" value="${esc(me.phone)}" /></label>
+      <label>Email <input name="email" type="email" autocomplete="email" value="${esc(me.email)}" required /></label>
+      <label>Phone <input name="phone" autocomplete="tel" value="${esc(me.phone)}" required /></label>
       <label>Address <input name="address" autocomplete="street-address" value="${esc(me.address)}" /></label>
       <p class="form-ok hidden" id="stProfOk">Saved.</p>
-      <button class="btn btn-primary" type="submit">Save changes</button>
+      <button class="btn btn-success" type="submit">Save changes</button>
     </form>
     <hr style="margin:1.4rem 0;border:0;border-top:1px solid var(--line)">
     <h4 style="margin-bottom:.6rem">Change password</h4>
     <form class="form" id="stPwForm">
       <label>Current password <input name="current" type="password" autocomplete="current-password" required /></label>
-      <label>New password <input name="next" type="password" autocomplete="new-password" required minlength="4" /></label>
+      <label>New password <input name="next" type="password" autocomplete="new-password" required minlength="8" pattern="(?=.*[A-Z])(?=.*\\d).{8,}" title="At least 8 characters, with one uppercase letter and one number." /></label>
+      <p class="pw-hint">At least 8 characters, 1 uppercase letter and 1 number.</p>
       <p class="form-error hidden" id="stPwErr"></p>
       <p class="form-ok hidden" id="stPwOk">Password updated.</p>
-      <button class="btn btn-login" type="submit">Update password</button>
+      <button class="btn btn-success" type="submit">Update password</button>
     </form>`;
   $('#panelModal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
 
@@ -3083,6 +3337,8 @@ function openStaffProfile(me) {
     e.preventDefault();
     const f = new FormData(e.target); const err = $('#stPwErr'), ok = $('#stPwOk');
     err.classList.add('hidden'); ok.classList.add('hidden');
+    const pwErr = validatePassword(f.get('next'));
+    if (pwErr) { err.textContent = pwErr; err.classList.remove('hidden'); return; }
     try { await API.changePassword(me.id, f.get('current'), f.get('next')); ok.classList.remove('hidden'); e.target.reset(); }
     catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
   });

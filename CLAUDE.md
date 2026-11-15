@@ -2,7 +2,7 @@
 
 > Purpose: this file is the single source of truth for how the project works, so a fresh
 > session can skip re-exploring the codebase. **Keep it updated on every change.**
-> Last updated: 2026-10-14.
+> Last updated: 2026-11-15.
 
 ## What it is
 Static marketing + member site for **Lucky Lion eBike (Trece Martires, Cavite)**. Capstone
@@ -974,3 +974,40 @@ User can deploy Netlify only a few times but can run SQL freely → **build/veri
   + `lucky-lion-site.zip` rebuilt. **No JS/CSS change → no cache-bust bump** (no-cache dev server
   reloads JSON/image on refresh; after a real Netlify deploy, hard-refresh since content.json/images
   aren't versioned). Edits in-place (not a worktree). **PENDING:** drag the zip to Netlify. Not committed.
+- 2026-11-15: **Enhancement batch (11 items) + notification-bell improvement. NEW SQL pending.**
+  Built on branch `worktree-enhancements-nov2026`. **NEW SQL (run once): `supabase/enhancements-2026-11.sql`**
+  — adds `repairs.handled_by`, `repairs.rating`, `repairs.review`, `repairs.reviewed_at` (idempotent).
+  All new writes are retry-safe if the SQL isn't run yet (`api.js` `updateRepair`/`submitReview`).
+  Items: (1) **Buttons recoloured** — every delete/cancel/remove ghost button got the `danger` class
+  (red) + a CSS safety-net (`.btn.var-del/.del-user/.rep-del/.rep-cancel/.del-model/.remove-model`);
+  save/update/apply submit buttons switched `btn-primary`→**`btn-success`** (green) across both files
+  (repair Save changes, Update password, Save new password, Save settings, Save photo, Save unit, the
+  colour/spec Saves); `.tip-cat h4` red→`--ink`. (2) **Required phone + email** (signup, staff
+  create, both profiles) via the `required` attr (the `startRequiredObserver` auto-adds the red `*`).
+  (3) **Password policy** ≥8 chars/1 uppercase/1 number — shared `validatePassword()` in BOTH files,
+  applied on signup + every change/forced-change path; inputs got `minlength=8`+`pattern`+a `.pw-hint`.
+  (4) **Auto-generated temp password** — staff Create-User has an Auto-generate (default, `genPassword()`,
+  shown read-only + Copy/New) / Set-manually toggle; the temp password is shown on-screen after create
+  for staff to share. (5) **Email on account creation — DEFERRED** at owner's request (no code; plan
+  later, likely EmailJS). (6) **Who repaired it** — `Handled by` field in the repair editor →
+  `repairs.handled_by`, shown on rows via `repMeta`. (7) **Motor-watts/Battery dropdowns** — `specSelect()`
+  + `readSpec()` + delegated `wireSpecSelects()`; common values + "Other…" in the model Specs editor
+  and Add-model form (`MOTOR_W_OPTIONS`/`BATTERY_OPTIONS`; stored values unchanged). (8) **General-issue
+  dropdown on public booking** — `REPAIR_ISSUES` select + "Other…" in `panelSchedule`, saved as
+  `repairType`. (9) **Customer star review** — `renderMyReps` shows a ★1–5 + comment on `done` repairs
+  → `API.submitReview`; **admin ⭐ Reviews board** (`#reviews` view, `renderReviews`/`paintReviews`,
+  branch filter + sort; added to `VIEWS`+`ADMIN_ONLY_VIEWS`). Reviews also surface on staff repair rows
+  (`repMeta`). (10) **Report export** — ⬇ Export (Excel/PDF choice) on the Repairs + Registry toolbars
+  (`exportControl`/`wireExport`/`exportRows`; SheetJS + jsPDF + autotable CDN added to `staff.html`;
+  `REG_VIEW`/`REP_EXPORT_ROWS` carry the filtered rows). (11) **Notification bell improvement** — the
+  staff/admin bell (`refreshStaffNotifications`) now also lists **unread customer messages** (💬,
+  persist until the thread is read; clicking opens that inbox thread), not just repair changes; opening
+  the bell dismisses repair items but keeps message items; `markMessagesRead` now refreshes the bell.
+  New CSS appended (pw toggle, `.stars`, `.export-*`, `.reviews-filters`, `.rev-stars`). **No email
+  code.** Cache-bust **`20261108a`→`20261115a`** (styles.css+api.js both pages; app.js index; staff.js
+  staff). `deploy/` synced + `lucky-lion-site.zip` rebuilt. All JS `jsc` parse-clean; CSS braces
+  balanced (1191/1191). **NOT browser-verified** (Chrome extension offline). **PENDING USER ACTION:**
+  (1) run `supabase/enhancements-2026-11.sql`; (2) drag the zip to Netlify. **Still open (not built):**
+  before/after screenshot PDF (owner wants it later); **admin↔staff messaging** + highlighting admin
+  messages in the staff inbox (owner asked — needs design confirmation, likely reuses `messages` with
+  `user_id`=staff + `sender`='admin', no schema change).
