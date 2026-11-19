@@ -79,3 +79,43 @@ alter table repairs add column if not exists handled_by  text;          -- staff
 alter table repairs add column if not exists rating      int;           -- customer rating 1–5
 alter table repairs add column if not exists review      text;          -- customer comment
 alter table repairs add column if not exists reviewed_at timestamptz;   -- when the review was left
+
+-- ============================================================
+-- Part C — Trash Bin (soft delete) + Activity Log (admin-fixes batch, item 2)
+-- ============================================================
+-- After this runs, js/api.js detectTrash() flips soft-delete ON automatically:
+-- deleting a customer / repair / e-bike unit sets deleted_at (Restorable from the
+-- admin Trash Bin) instead of hard-deleting; key actions are written to activity_log.
+-- Until it's run, the app behaves exactly as before (permanent deletes, empty Trash).
+
+-- 1) Soft-delete marker on the three deletable tables.
+alter table public.users       add column if not exists deleted_at timestamptz;
+alter table public.repairs     add column if not exists deleted_at timestamptz;
+alter table public.user_ebikes add column if not exists deleted_at timestamptz;
+
+-- Partial indexes so the "not deleted" list filter stays fast.
+create index if not exists users_not_deleted_idx       on public.users       (deleted_at) where deleted_at is null;
+create index if not exists repairs_not_deleted_idx     on public.repairs     (deleted_at) where deleted_at is null;
+create index if not exists user_ebikes_not_deleted_idx on public.user_ebikes (deleted_at) where deleted_at is null;
+
+-- 2) Audit trail.
+create table if not exists public.activity_log (
+  id         text primary key,
+  at         timestamptz not null default now(),
+  actor      text,              -- who did it (name or username)
+  actor_role text,              -- 'admin' | 'staff' | 'customer'
+  action     text not null,     -- 'create' | 'delete' | 'restore' | 'purge'
+  entity     text,              -- 'customer' | 'staff' | 'admin' | 'repair' | 'unit'
+  entity_id  text,
+  summary    text               -- human-readable line shown in the log
+);
+create index if not exists activity_log_at_idx on public.activity_log (at desc);
+
+-- Prototype: open access via the anon key (same posture as every other table).
+alter table public.activity_log enable row level security;
+do $$
+begin
+  if not exists (select 1 from pg_policies where tablename = 'activity_log' and policyname = 'activity_log_all') then
+    create policy activity_log_all on public.activity_log for all using (true) with check (true);
+  end if;
+end $$;

@@ -241,6 +241,17 @@ function wireColorFields() {
   });
 }
 
+// #4: contact-number fields accept digits (and the usual phone separators + - ( ) space) only — block letters
+function wirePhoneDigits() {
+  const bad = /[^\d+\-() ]/g;
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (!t || !t.matches || !t.matches('input[name="phone"], input[name="branchPhone"]')) return;
+    const clean = t.value.replace(bad, '');
+    if (clean !== t.value) { const p = t.selectionStart; t.value = clean; try { t.setSelectionRange(p - 1, p - 1); } catch { } }
+  });
+}
+
 // staff avatar — photo if set, otherwise an initial-letter placeholder circle
 function avatarImg(u, cls) {
   const initial = ((u && (u.name || u.username)) || '?').trim().charAt(0).toUpperCase();
@@ -259,7 +270,7 @@ const myBranch = () => (ME && ME.branch) || null;
 const userById = (id) => REP_USERS[id];
 const branchOfUser = (id) => { const u = REP_USERS[id]; return u ? u.branch : null; };
 // admin-only views (staff cannot open these; their drawer links are hidden too)
-const ADMIN_ONLY_VIEWS = ['analytics', 'reviews', 'models', 'photos', 'settings'];
+const ADMIN_ONLY_VIEWS = ['analytics', 'reviews', 'models', 'photos', 'settings', 'trash', 'activity'];
 // which branch an oversight view is currently showing. null = all (admin default); staff = own branch.
 let VIEW_BRANCH = null;
 
@@ -275,6 +286,10 @@ async function init() {
   // #8: a temporary-password account must set a new password before using the portal.
   if (me.mustChangePassword) { await forceStaffPasswordChange(me); return; }
   ME = me;
+  // item 2: record who is acting (for the Activity Log) + detect whether the Trash Bin
+  // migration has been run. detectTrash() flips soft-delete on only if the columns exist.
+  API.setActor(me);
+  await API.detectTrash();
   // staff oversight views default to their own branch; admin defaults to "all"
   VIEW_BRANCH = isAdmin() ? null : myBranch();
   document.body.classList.toggle('is-admin', isAdmin());
@@ -288,6 +303,7 @@ async function init() {
   $('#staffName').textContent = `Signed in as ${me.name || me.username}`;
   wireColorFields();   // delegated colour-picker behaviour for variants + unit forms
   wireSpecSelects();   // #11: motor/battery dropdown "Other…" toggling
+  wirePhoneDigits();   // #4: digits-only for contact-number fields
   // user/unit actions (delegated; survives re-renders)
   $('#usersList').addEventListener('click', async e => {
     const delU = e.target.closest('.del-user');
@@ -295,15 +311,21 @@ async function init() {
     const addE = e.target.closest('.add-ebike');
     const editBtn = e.target.closest('.unit-edit-btn');
     if (delU) {
-      if (!(await confirmAction(`Delete "${delU.dataset.name}"? This removes the account and their repair records.`, { title: 'Delete account', confirmLabel: 'Delete', danger: true }))) return;
+      const soft = API.trashReady();
+      const msg = soft
+        ? `Move "${delU.dataset.name}" to the Trash Bin? You can restore the account (and its records) later from Trash.`
+        : `Delete "${delU.dataset.name}"? This removes the account and their repair records.`;
+      if (!(await confirmAction(msg, { title: soft ? 'Move to Trash' : 'Delete account', confirmLabel: soft ? 'Move to Trash' : 'Delete', danger: true }))) return;
       delU.disabled = true;
-      try { await API.deleteUser(delU.dataset.id); await renderUsers(); }
+      try { await API.deleteUser(delU.dataset.id, delU.dataset.name); await renderUsers(); }
       catch (ex) { alert('Delete failed: ' + ex.message); delU.disabled = false; }
     } else if (delE) {
-      if (!(await confirmAction('Remove this e-bike from the customer?', { title: 'Remove unit', confirmLabel: 'Remove', danger: true }))) return;
+      const soft = API.trashReady();
+      const label = delE.dataset.label || 'this e-bike';
+      if (!(await confirmAction(soft ? 'Move this e-bike to the Trash Bin? You can restore it later.' : 'Remove this e-bike from the customer?', { title: soft ? 'Move to Trash' : 'Remove unit', confirmLabel: soft ? 'Move to Trash' : 'Remove', danger: true }))) return;
       delE.disabled = true;
       const det = delE.closest('details[data-user]');
-      try { await API.removeUserEbike(delE.dataset.id); if (det) await refreshUnits(det.dataset.user); }
+      try { await API.removeUserEbike(delE.dataset.id, label); if (det) await refreshUnits(det.dataset.user); }
       catch (ex) { alert('Failed: ' + ex.message); delE.disabled = false; }
     } else if (addE) {
       const box = addE.closest('.add-unit');
@@ -312,6 +334,7 @@ async function init() {
       const cust = CUSTOMERS.find(c => c.id === addE.dataset.user);
       detail.branch = (cust && cust.branch) || myBranch();
       const modelId = box.querySelector('.unit-model').value;
+      if (!modelId) { toast('Please choose a unit first.'); return; }
       if (!(await confirmAction('Add this e-bike to the customer?', { title: 'Add unit', confirmLabel: 'Add unit' }))) return;
       addE.disabled = true;
       try {
@@ -373,6 +396,7 @@ async function init() {
   await initPoster();
 
   renderDashboard();
+  wireTrash();                       // item 2: Trash Bin + Activity Log
   updateInboxBadgeCount();
   wireStaffNotifications();          // #16: notification bell
   refreshStaffNotifications();
@@ -411,7 +435,7 @@ function forceStaffPasswordChange(me) {
 
 /* ================= SIDE DRAWER + VIEW ROUTER =================
    One section is visible at a time; the burger opens a grouped menu. */
-const VIEWS = ['dashboard', 'analytics', 'reviews', 'users', 'create', 'repairs', 'inbox', 'registry', 'models', 'photos', 'poster', 'settings'];
+const VIEWS = ['dashboard', 'analytics', 'reviews', 'users', 'create', 'repairs', 'inbox', 'registry', 'models', 'photos', 'poster', 'settings', 'trash', 'activity'];
 const viewFromHash = () => {
   const h = (location.hash || '').replace('#', '');
   return VIEWS.includes(h) ? h : 'dashboard';
@@ -432,6 +456,8 @@ function showView(view, push = true) {
   if (view === 'reviews') renderReviews();
   if (view === 'registry') renderRegistry();
   if (view === 'inbox') renderInbox();
+  if (view === 'trash') renderTrash();
+  if (view === 'activity') renderActivity();
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
@@ -1230,11 +1256,19 @@ function autoColour(box, varSel) {
   const opt = varSel.selectedOptions[0];
   if (opt) setColorField(box, opt.dataset.name || '');
 }
+// #7: the colour now comes straight from the chosen variant (the available-colour dropdown),
+// so there is no longer a separate colour-label control to read.
+function variantColorName(box) {
+  if (!box) return '';
+  const v = box.querySelector('select[name="variantId"]');
+  const o = v && v.selectedOptions[0];
+  return (o && (o.dataset.name || '').trim()) || '';
+}
 // read the unit detail out of an add-unit box or edit form
 function readUnitDetail(box) {
   const val = n => { const el = box.querySelector(`[name="${n}"]`); return el ? el.value.trim() : ''; };
   return {
-    variantId: val('variantId') || null, color: cfColorValue(box), chassisNo: val('chassisNo'), batteryNo: val('batteryNo'), motorNo: val('motorNo'), acquiredAt: val('acquiredAt'),
+    variantId: val('variantId') || null, color: variantColorName(box) || cfColorValue(box), chassisNo: val('chassisNo'), batteryNo: val('batteryNo'), motorNo: val('motorNo'), acquiredAt: val('acquiredAt'),
     saleNote: val('saleNote')
   };
 }
@@ -2174,7 +2208,7 @@ async function openCustomerDetail(userId) {
   const repSorted = reps.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
   body.innerHTML = `
     <h3 class="panel-title">${esc(u.name || u.username)}</h3>
-    <p class="panel-sub">${u.memberId ? esc(u.memberId) + ' · ' : ''}@${esc(u.username)}${u.branch ? ' · ' + esc(branchName(u.branch)) : ''}</p>
+    <p class="panel-sub">@${esc(u.username)}${u.branch ? ' · ' + esc(branchName(u.branch)) : ''}</p>
     <div class="cd-contact">
       ${u.phone ? `<div class="b-meta"><a href="tel:${esc(u.phone)}">📞 ${esc(u.phone)}</a></div>` : '<div class="b-meta b-meta-missing">📞 No phone on file</div>'}
       ${u.email ? `<div class="b-meta">✉️ ${esc(u.email)}</div>` : ''}
@@ -2233,7 +2267,7 @@ function renderBranchPhonesEditor() {
   host.innerHTML = BRANCHES.map(b => {
     const val = (m[b.key] != null && m[b.key] !== '') ? m[b.key] : (branchInfo(b.key).phone || '');
     return `<label class="bp-row">${esc(b.name)}${b.key === HOME_BRANCH_KEY ? ' <span class="cc-star" title="Site default number">★ default</span>' : ''}
-      <input class="bp-input" name="branchPhone" data-key="${esc(b.key)}" value="${esc(val)}" placeholder="e.g. 0997-955-8909" /></label>`;
+      <input class="bp-input" name="branchPhone" data-key="${esc(b.key)}" value="${esc(val)}" inputmode="numeric" placeholder="e.g. 0997-955-8909" /></label>`;
   }).join('');
 }
 function gatherBranchPhones() {
@@ -2402,10 +2436,7 @@ function unitRow(e, canEdit = true) {
     <div class="unit-meta b-meta">${serials}${!canEdit && e.acquired_at ? ` · Acquired ${esc(e.acquired_at)}` : ''}</div>
     ${unitSaleLine(e)}
     ${canEdit ? `<form class="form unit-edit-form hidden" data-id="${esc(e.id)}" data-model="${esc(e.model_id)}">
-      <div class="grid2">
-        <label>Colour <select name="variantId">${variantOptions(e.model_id, e.variant_id)}</select></label>
-        <div class="cf-labeled">Colour label ${colorLabelField(e.color, colorHexOf(e.color), false, '— colour —')}</div>
-      </div>
+      <label>Colour <select name="variantId">${variantOptions(e.model_id, e.variant_id)}</select></label>
       <div class="grid3">
         <label>Chassis no. <input name="chassisNo" value="${esc(e.chassis_no || '')}" /></label>
         <label>Battery no. <input name="batteryNo" value="${esc(e.battery_no || '')}" /></label>
@@ -2431,8 +2462,8 @@ function lastRepairLine(u) {
 function custRow(u, canEdit = true) {
   const units = EBIKES_BY_USER[u.id] || [];
   const models = STORE.products.models;
-  const options = models.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
-  const firstModel = models.length ? models[0].id : '';
+  // #6: a non-selectable "Select unit" placeholder so the model isn't pre-filled with the first unit
+  const options = `<option value="" selected disabled>Select unit</option>` + models.map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('');
   return `<details class="acc" data-user="${esc(u.id)}">
     <summary>
       <span class="acc-left"><span class="acc-title">${esc(u.name || u.username)}</span></span>
@@ -2445,11 +2476,13 @@ function custRow(u, canEdit = true) {
       <div class="units-block">
         <div class="b-meta" style="margin-bottom:.35rem"><strong>Units (${units.length})</strong></div>
         ${units.map(e => unitRow(e, canEdit)).join('') || '<div class="b-meta" style="color:var(--muted)">No units yet.</div>'}
-        ${canEdit ? `<div class="add-unit" data-user="${esc(u.id)}">
+      </div>
+      ${canEdit ? `<details class="add-unit-card">
+        <summary><span>➕ Add a unit</span><span class="acc-chev" aria-hidden="true">▾</span></summary>
+        <div class="add-unit" data-user="${esc(u.id)}">
           <div class="add-unit-grid">
             <select class="unit-model" name="unitModel" aria-label="Model to add">${options}</select>
-            <select class="unit-variant" name="variantId" aria-label="Colour">${variantOptions(firstModel, null)}</select>
-            ${colorLabelField('', '', false, '— colour —')}
+            <select class="unit-variant" name="variantId" aria-label="Colour">${variantOptions('', null)}</select>
             <input name="chassisNo" placeholder="Chassis no." />
             <input name="batteryNo" placeholder="Battery no." />
             <input name="motorNo" placeholder="Motor no." />
@@ -2457,8 +2490,8 @@ function custRow(u, canEdit = true) {
             <input name="saleNote" placeholder="Sale note (staff only)" />
           </div>
           <button class="btn btn-ghost btn-sm add-ebike" data-user="${esc(u.id)}">Add unit</button>
-        </div>` : ''}
-      </div>
+        </div>
+      </details>` : ''}
       ${canEdit ? `<button class="btn btn-ghost btn-sm danger del-user" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}" style="margin-top:.7rem">Delete user</button>` : '<div class="b-meta" style="color:var(--muted);margin-top:.5rem">👁 View only — this customer belongs to another branch.</div>'}
     </div>
   </details>`;
@@ -2817,9 +2850,10 @@ function wireRepairRows() {
     catch (e) { alert('Failed: ' + e.message); b.disabled = false; }
   }));
   $$('#repRows .rep-del').forEach(b => b.addEventListener('click', async () => {
-    if (!(await confirmAction('Delete this repair record? This cannot be undone.', { title: 'Delete repair', confirmLabel: 'Delete', danger: true }))) return;
+    const soft = API.trashReady();
+    if (!(await confirmAction(soft ? 'Move this repair record to the Trash Bin? You can restore it later.' : 'Delete this repair record? This cannot be undone.', { title: soft ? 'Move to Trash' : 'Delete repair', confirmLabel: soft ? 'Move to Trash' : 'Delete', danger: true }))) return;
     b.disabled = true;
-    try { await API.deleteRepair(b.dataset.id); await renderRepairs(); }
+    try { await API.deleteRepair(b.dataset.id, b.dataset.label || 'a repair'); await renderRepairs(); }
     catch (e) { alert('Delete failed: ' + e.message); b.disabled = false; }
   }));
   $$('#repRows .rep-edit').forEach(b => b.addEventListener('click', () => { const r = byId(b.dataset.id); if (r) openRepairEditor(r); }));
@@ -3045,7 +3079,7 @@ function wireCreate() {
       if (isCust && modelId) {
         try {
           await API.addUserEbike(u.id, modelId, {
-            variantId: f.get('variantId') || null, color: cfColorValue(details), branch,
+            variantId: f.get('variantId') || null, color: variantColorName(details) || cfColorValue(details), branch,
             chassisNo: (f.get('chassisNo') || '').trim(), batteryNo: (f.get('batteryNo') || '').trim(),
             motorNo: (f.get('motorNo') || '').trim(), acquiredAt: (f.get('acquiredAt') || '').trim() || todayISO(),
             saleNote: (f.get('saleNote') || '').trim()
@@ -3343,4 +3377,104 @@ function openStaffProfile(me) {
     try { await API.changePassword(me.id, f.get('current'), f.get('next')); ok.classList.remove('hidden'); e.target.reset(); }
     catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
   });
+}
+
+/* ================= TRASH BIN + ACTIVITY LOG (item 2) ================= */
+// A friendly "Nov 10, 2026 · 3:14 PM" from an ISO timestamp.
+function whenText(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return d.toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+// Note shown when the trash-activity migration hasn't been run yet.
+function trashSetupNote() {
+  return `<div class="trash-setup">
+    <strong>Trash Bin isn't set up yet.</strong>
+    <p>Deletes are still permanent until an admin runs <code>supabase/trash-activity.sql</code> in Supabase → SQL Editor (one time). After that, deleted customers, repairs and units land here first and can be restored.</p>
+  </div>`;
+}
+function trashRow(kind, id, label, when) {
+  const icon = kind === 'customer' ? '👤' : kind === 'unit' ? '🛵' : '🛠️';
+  const kindWord = kind === 'customer' ? 'Customer' : kind === 'unit' ? 'E-bike unit' : 'Repair';
+  return `<div class="trash-row" data-kind="${kind}" data-id="${esc(id)}" data-label="${esc(label)}">
+    <div class="tr-main">
+      <span class="tr-ic" aria-hidden="true">${icon}</span>
+      <div>
+        <div class="tr-label">${nt(label)}</div>
+        <div class="tr-when">${esc(kindWord)}${when ? ' · deleted ' + esc(whenText(when)) : ''}</div>
+      </div>
+    </div>
+    <div class="tr-actions">
+      <button class="btn btn-ghost tr-restore" type="button">↩︎ Restore</button>
+      <button class="btn btn-ghost danger tr-purge" type="button">Delete forever</button>
+    </div>
+  </div>`;
+}
+async function renderTrash() {
+  const host = $('#trashList');
+  if (!host) return;
+  if (!API.trashReady()) { host.innerHTML = trashSetupNote(); return; }
+  host.innerHTML = `<p class="muted" style="text-align:center">Loading…</p>`;
+  let t;
+  try { t = await API.getTrash(); } catch (e) { host.innerHTML = `<p class="muted">Couldn't load the Trash Bin: ${esc(e.message)}</p>`; return; }
+  const rows = [];
+  (t.users || []).forEach(u => rows.push({ kind: 'customer', id: u.id, label: `${u.name || u.username}${u.memberId ? ' (' + u.memberId + ')' : ''}`, when: u.deletedAt }));
+  (t.ebikes || []).forEach(e => {
+    const m = STORE.modelById(e.model_id);
+    const bits = [m ? m.name : e.model_id, e.color, e.chassis_no].filter(Boolean).join(' · ');
+    rows.push({ kind: 'unit', id: e.id, label: bits, when: e.deleted_at });
+  });
+  (t.repairs || []).forEach(r => {
+    const m = STORE.modelById(r.modelId);
+    rows.push({ kind: 'repair', id: r.id, label: `${m ? m.name : r.modelId} — ${r.repairType || 'repair'} · ${r.date || ''}`, when: r.deletedAt });
+  });
+  if (!rows.length) { host.innerHTML = `<p class="muted" style="text-align:center;padding:2rem 0">🗑️ The Trash Bin is empty.</p>`; return; }
+  host.innerHTML = `<p class="trash-h">${rows.length} item${rows.length === 1 ? '' : 's'} in Trash — restore anything removed by mistake.</p>` +
+    rows.map(r => trashRow(r.kind, r.id, r.label, r.when)).join('');
+}
+function wireTrash() {
+  const host = $('#trashList');
+  if (!host) return;
+  host.addEventListener('click', async e => {
+    const row = e.target.closest('.trash-row'); if (!row) return;
+    const { kind, id, label } = row.dataset;
+    if (e.target.closest('.tr-restore')) {
+      if (!(await confirmAction(`Restore "${label}"?`, { title: 'Restore', confirmLabel: 'Restore' }))) return;
+      try { await API.restoreItem(kind, id, label); toast('Restored.'); await renderTrash(); await refreshAfterTrash(kind); }
+      catch (ex) { alert('Restore failed: ' + ex.message); }
+    } else if (e.target.closest('.tr-purge')) {
+      if (!(await confirmAction(`Permanently delete "${label}"? This cannot be undone.`, { title: 'Delete forever', confirmLabel: 'Delete forever', danger: true }))) return;
+      try { await API.purgeItem(kind, id, label); toast('Permanently deleted.'); await renderTrash(); }
+      catch (ex) { alert('Delete failed: ' + ex.message); }
+    }
+  });
+}
+// After a restore, refresh whichever list the item belongs to so it reappears there.
+async function refreshAfterTrash(kind) {
+  try {
+    if (kind === 'customer') { await renderUsers(); }
+    else if (kind === 'repair') { await renderRepairs(); }
+    else if (kind === 'unit') { await loadVariants(); }
+    updateInboxBadgeCount();
+  } catch { }
+}
+
+async function renderActivity() {
+  const host = $('#activityList');
+  if (!host) return;
+  if (!API.trashReady()) { host.innerHTML = trashSetupNote(); return; }
+  host.innerHTML = `<p class="muted" style="text-align:center">Loading…</p>`;
+  let log;
+  try { log = await API.getActivityLog(150); } catch (e) { host.innerHTML = `<p class="muted">Couldn't load the Activity Log: ${esc(e.message)}</p>`; return; }
+  if (!log.length) { host.innerHTML = `<p class="muted" style="text-align:center;padding:2rem 0">📜 No activity recorded yet.</p>`; return; }
+  const iconFor = a => a === 'create' ? '➕' : a === 'delete' ? '🗑️' : a === 'restore' ? '↩︎' : a === 'purge' ? '❌' : '•';
+  host.innerHTML = `<div class="act-list">` + log.map(r => `
+    <div class="act-row">
+      <span class="act-ic" aria-hidden="true">${iconFor(r.action)}</span>
+      <div class="act-main">
+        <div class="act-text">${nt(r.summary || r.action)}</div>
+        <div class="act-when">${esc(r.actor || 'system')}${r.actorRole ? ' (' + esc(r.actorRole) + ')' : ''} · ${esc(whenText(r.at))}</div>
+      </div>
+    </div>`).join('') + `</div>`;
 }
