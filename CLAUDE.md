@@ -2,7 +2,7 @@
 
 > Purpose: this file is the single source of truth for how the project works, so a fresh
 > session can skip re-exploring the codebase. **Keep it updated on every change.**
-> Last updated: 2026-10-14.
+> Last updated: 2026-11-19.
 
 ## What it is
 Static marketing + member site for **Lucky Lion eBike (Trece Martires, Cavite)**. Capstone
@@ -58,7 +58,7 @@ There are **3 roles**: `customer`, `staff`, `admin`, and **9 branches** (keys/co
 
 ## Data layer & Supabase tables (all RLS = open, anon key; prototype)
 `js/api.js` methods, by table:
-- **users** — login, currentUser, getUsers, createUser (auto member_id per **branch+role**, roles customer/staff/admin), updateUser (incl. `branch`), deleteUser, changePassword. Rows carry `role` + `branch`.
+- **users** — login, currentUser, getUsers, createUser (auto member_id per **branch+role**, roles customer/staff/admin), updateUser (incl. `branch`), deleteUser, changePassword. Rows carry `role` + `branch`. **Passwords are bcrypt-hashed** (`supabase/password-hashing.sql`): a `BEFORE INSERT/UPDATE` trigger hashes the `password` column on write, `login()` verifies via the `verify_login` RPC and `changePassword()` via the `verify_password` RPC — plaintext is never compared in the browser (both fall back to the old plaintext match if the SQL isn't run yet). **Only ONE admin exists:** `createUser` throws on `role:'admin'` and the staff create-user form no longer offers Admin, so the single seeded `admin` (multibranch.sql) is the only administrator.
 - **variant_stock** (new, `multibranch.sql`) — per-branch brand-new stock: getAllVariantStock, getBranchStock, setVariantStock, adjustVariantStock, decrementVariantStock(id,branch). **`avatar_url`** (added by `staff-avatars.sql`) is a staff-only profile photo; `API.uploadAvatar(blob)` uploads to the shared `store-photos` bucket (`avatar-*.jpg`) and returns the URL, saved via `updateUser({avatarUrl})`. Customers leave it null.
 - **user_ebikes** — a customer can own several units: get/add/remove/**updateUserEbike**. Columns added by `ebike-details.sql`: **variant_id, color, chassis_no, battery_no, motor_no** (the chosen colour + physical serial numbers). `addUserEbike(userId, modelId, {variantId,color,chassisNo,batteryNo,motorNo})` also **decrements that variant's stock**.
 - **model_variants** (added by `variants.sql`) — a model's colour options + per-colour stock: id, model_id, name, color_hex, **stock**, sort. `API`: getAllModelVariants, getModelVariants, addVariant, updateVariant, deleteVariant (also deletes that colour's photos), **adjustStock(id,delta)** / **decrementStock(id)**. `variants.sql` seeds **2 placeholder colours (Red/Black, stock 0) per base model**. `model_photos` gained a nullable **variant_id** (NULL = general photo shown for every colour; set = that colour's photo).
@@ -203,6 +203,29 @@ User can deploy Netlify only a few times but can run SQL freely → **build/veri
 - **Pending SQL:** run **`supabase/RUN-ALL-new-features.sql`** — a single combined file with all of it (variants+stock, pre-loved + its 1-of-1 unit columns `color/chassis_no/battery_no/motor_no/sold`, unit details+acquired date, messages). Re-running is safe (idempotent), so if you ran an earlier version just run it again for the new pre-loved columns. Individual files (`variants.sql`, `ebike-details.sql`, `preloved.sql`, `preloved-details.sql`, `unit-acquired.sql`, `messages.sql`) remain for reference. NOTE: adding a customer unit now always sends the new `user_ebikes` columns (incl. `acquired_at`), so `ebike-details.sql` **and** `unit-acquired.sql` must be run or unit-add fails.
 
 ## Recent changes log
+- 2026-11-19: **Security hardening for the CVSU Test Instrument + one-admin rule.** Addresses the
+  failing Security-module rows and the admin-creation ask. (1) **Password hashing (real PASS):** new
+  **`supabase/password-hashing.sql`** (pending user run) enables `pgcrypto`, adds a `BEFORE
+  INSERT/UPDATE` trigger that bcrypt-hashes `users.password` on write (skips already-hashed values),
+  one-time backfills the existing rows, and adds two `security definer` RPCs — `verify_login(username,
+  password)` and `verify_password(id, password)` — so the password is compared **server-side in
+  Postgres**, never in the browser. `js/api.js` `login()` and `changePassword()` now call those RPCs,
+  each with a **graceful fallback to the old plaintext match** if the RPC doesn't exist yet (so nothing
+  breaks before the SQL is run). Existing demo logins (`admin/admin123` etc.) keep working — the
+  backfill hashes them in place. No other code compared passwords client-side (grep-verified), so no
+  other breakage. (2) **One admin only:** `API.createUser` throws on `role:'admin'`
+  ("Only one administrator account is allowed…"), and the staff/admin **Create User** form
+  (`wireCreate`, `js/staff.js`) no longer offers the **Admin** option (title/lead relabelled "Create
+  User / Staff"). The single admin is the one seeded by `multibranch.sql` (comment updated). (3) **Test
+  Instrument doc wording:** `~/Downloads/Test_Instrument_LuckyLion.docx` "email and password" → "username
+  and password" (7×; the system logs in by username). Original backed up as `*.ORIGINAL.docx` (both
+  outside the repo). (4) Branch isolation + field encryption are **documented as prototype limitations**
+  (open anon key; a browser-only app can't hold a decryption key) — HTTPS/TLS covers data in transit and
+  password hashing covers the one truly sensitive field. **PENDING USER ACTION:** run
+  `supabase/password-hashing.sql` in Supabase, then drag the rebuilt `lucky-lion-site.zip` to Netlify.
+  Cache-bust **api.js `20261012c`→`20261119a`** (both pages) + **staff.js `20261026b`→`20261119a`**;
+  `deploy/` synced (mirror verified) + zip rebuilt (index.html at root). JS parse-checked (jsc); not
+  browser-verified (background job). Work done on git branch `worktree-security-fixes`.
 - 2026-10-26 (c): **Removed the redundant single "Business hours" field from Site Settings.** It
   duplicated the per-branch **🕘 Branch operating hours** editor (`branch_hours` JSON). Deleted the
   `<label>Business hours <input name="hours"></label>` from `staff.html` and dropped `'hours'` from

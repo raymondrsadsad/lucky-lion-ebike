@@ -59,7 +59,16 @@ const API = (() => {
 
     // ---- auth ----
     async login(username, password, remember) {
-      const rows = await req(`/users?username=eq.${encodeURIComponent(String(username).trim())}&password=eq.${encodeURIComponent(password)}&select=*`);
+      const uname = String(username).trim();
+      let rows;
+      // Passwords are bcrypt-hashed (password-hashing.sql): verify server-side via RPC so the
+      // plaintext is never compared in the browser. Falls back to the legacy plaintext match
+      // only if the RPC isn't created yet (SQL not run), so the app never breaks pre-migration.
+      try {
+        rows = await req('/rpc/verify_login', { method: 'POST', body: JSON.stringify({ p_username: uname, p_password: password }) });
+      } catch (e) {
+        rows = await req(`/users?username=eq.${encodeURIComponent(uname)}&password=eq.${encodeURIComponent(password)}&select=*`);
+      }
       if (!rows || !rows.length) throw new Error('Invalid username or password.');
       setSession(rows[0].id);
       return toApp(rows[0]);
@@ -76,9 +85,12 @@ const API = (() => {
     async getUsers() { return (await req(`/users?select=*&order=created_at`) || []).map(toApp); },
     async getCustomers() { return (await req(`/users?role=eq.customer&select=*`) || []).map(toApp); },
     async createUser(data) {
+      const role = data.role || 'customer';
+      // There is exactly ONE administrator (seeded by multibranch.sql). No account —
+      // not even an admin — can create another admin through the app.
+      if (role === 'admin') throw new Error('Only one administrator account is allowed — a second admin cannot be created.');
       const dup = await req(`/users?username=eq.${encodeURIComponent(data.username.trim())}&select=id`);
       if (dup && dup.length) throw new Error('Username already taken.');
-      const role = data.role || 'customer';
       // Admins are global (no branch); staff/customers belong to one branch.
       const branch = role === 'admin' ? null : (data.branch || null);
       // Per-branch, per-role member IDs:
@@ -194,9 +206,17 @@ const API = (() => {
       return true;
     },
     async changePassword(id, current, next) {
-      const rows = await req(`/users?id=eq.${encodeURIComponent(id)}&select=password`);
-      if (!rows || !rows.length) throw new Error('User not found.');
-      if (rows[0].password !== current) throw new Error('Current password is incorrect.');
+      // Verify the current password server-side (bcrypt). Fall back to the legacy plaintext
+      // compare only if the RPC isn't created yet (password-hashing.sql not run).
+      let okMatch;
+      try {
+        okMatch = await req('/rpc/verify_password', { method: 'POST', body: JSON.stringify({ p_id: id, p_password: current }) });
+      } catch (e) {
+        const rows = await req(`/users?id=eq.${encodeURIComponent(id)}&select=password`);
+        if (!rows || !rows.length) throw new Error('User not found.');
+        okMatch = rows[0].password === current;
+      }
+      if (!okMatch) throw new Error('Current password is incorrect.');
       // #8: changing the password also clears the "must change" flag (retry without it if the column is absent).
       try { await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ password: next, must_change_password: false }) }); }
       catch (e) { await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ password: next }) }); }
