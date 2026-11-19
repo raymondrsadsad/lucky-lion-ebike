@@ -140,7 +140,10 @@
           <label id="createBranchWrap">Branch
             <select name="branch" id="createBranch" required></select>
           </label>
-          <label>Full name <input name="name" autocomplete="name" required /></label>
+          <div class="grid2">
+            <label>First name <input name="firstName" autocomplete="given-name" required /></label>
+            <label>Last name <input name="lastName" autocomplete="family-name" required /></label>
+          </div>
           <label>Username <input name="username" autocomplete="username" required /></label>
           <div class="pw-field">
             <span class="pw-field-label">Temporary password <span class="req" aria-hidden="true">*</span></span>
@@ -156,10 +159,10 @@
             <input class="pw-manual hidden" id="createPwManual" name="passwordManual" type="text" autocomplete="new-password" placeholder="Type a password" pattern="(?=.*[A-Z])(?=.*\d).{8,}" title="At least 8 characters, with one uppercase letter and one number." />
             <p class="pw-hint">At least 8 characters, 1 uppercase letter and 1 number. Staff shares this with the customer; they change it on first login.</p>
           </div>
-          <label>Phone <input name="phone" autocomplete="tel" inputmode="numeric" /></label>
-          <label>Email <input name="email" type="email" autocomplete="email" /></label>
+          <label>Phone <span class="phone-field"><span class="phone-cc">+63</span><input name="phone" class="phone10" autocomplete="tel" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX" required /></span></label>
+          <label>Email <input name="email" type="email" autocomplete="email" required /></label>
           <label>Address <input name="address" autocomplete="street-address" /></label>
-          <label>E-bike purchased (customers)
+          <label id="createOwnedWrap">E-bike purchased (customers)
             <select name="ownedModelId" id="ownedSelect"><option value="">— none —</option></select>
           </label>
           <div id="createUnitDetails" class="unit-details hidden">
@@ -171,8 +174,8 @@
               <label>Battery no. <input name="batteryNo" /></label>
               <label>Motor no. <input name="motorNo" /></label>
             </div>
-            <label>Acquired <input name="acquiredAt" type="date" /></label>
-            <label>Sale note (staff only) <input name="saleNote" placeholder="e.g. discount, 6-month Home Credit" /></label>
+            <label>Date acquired <input name="acquiredAt" type="date" /></label>
+            <label>Remarks (staff only) <input name="saleNote" placeholder="e.g. discount, 6-month Home Credit" /></label>
           </div>
           <p class="form-error hidden" id="createErr"></p>
           <p class="form-ok hidden" id="createOk"></p>
@@ -194,10 +197,10 @@
           <form class="form" id="addModelForm">
             <label>Name <input name="name" autocomplete="off" required /></label>
             <label>Type
-              <select name="wheels"><option value="4-wheels">4 Wheels</option><option value="3-wheels">3 Wheels</option><option value="2-wheels">2 Wheels</option></select>
+              <select name="wheels" required><option value="4-wheels">4 Wheels</option><option value="3-wheels">3 Wheels</option><option value="2-wheels">2 Wheels</option></select>
             </label>
             <label>Motor (Watts)
-              <select class="spec-select" name="motor_w">
+              <select class="spec-select" name="motor_w" required>
                 <option value="" selected>— choose —</option>
                 <option value="500">500W</option><option value="650">650W</option><option value="800">800W</option><option value="1000">1000W</option><option value="1200">1200W</option><option value="1500">1500W</option><option value="2000">2000W</option><option value="2500">2500W</option>
                 <option value="__other__">Other…</option>
@@ -205,15 +208,15 @@
               <input class="spec-other hidden" name="motor_wOther" type="number" placeholder="Type watts (number)" />
             </label>
             <label>Battery
-              <select class="spec-select" name="battery">
+              <select class="spec-select" name="battery" required>
                 <option value="" selected>— choose —</option>
                 <option>48V/20AH Lead Acid</option><option>60V/20AH Lead Acid</option><option>60V/30AH Lead Acid</option><option>60V/32AH Lead Acid</option><option>60V/45AH Lead Acid</option><option>60V/65AH Lead Acid</option>
                 <option value="__other__">Other…</option>
               </select>
               <input class="spec-other hidden" name="batteryOther" placeholder="e.g. 60V/20AH Lead Acid" />
             </label>
-            <label>Brakes <input name="brakes" placeholder="e.g. Front Disc / Rear Drum" /></label>
-            <label>Price (SRP) <input name="srp" type="number" /></label>
+            <label>Brakes <input name="brakes" placeholder="e.g. Front Disc / Rear Drum" required /></label>
+            <label>Price (SRP) <input name="srp" type="number" min="0" max="9999999" step="1" inputmode="numeric" required /></label>
             <div class="mp-block">
               <div class="mp-head"><strong>Main photo</strong>
                 <button type="button" class="btn btn-ghost btn-sm" id="newModelAddPhoto">+ Set main photo</button>
@@ -242,22 +245,22 @@
           <label>Fill from model <select id="posterModel"></select></label>
 
           <div class="form-group-title">On the poster</div>
-          <label>Model name <input name="name" autocomplete="off" /></label>
+          <label>Model name <input name="name" autocomplete="off" required /></label>
           <div class="grid2">
-            <label>Battery <input name="battery" placeholder="e.g. 60V 32Ah" /></label>
-            <label>Motor power <input name="motorW" placeholder="e.g. 1000W" /></label>
+            <label>Battery <input name="battery" placeholder="e.g. 60V 32Ah" required /></label>
+            <label>Motor power <input name="motorW" placeholder="e.g. 1000W" required /></label>
           </div>
           <div class="grid2">
-            <label>Load capacity <input name="loadKg" placeholder="e.g. 150 KG" /></label>
-            <label>Brake <input name="brake" placeholder="e.g. Front &amp; Rear Disc" /></label>
+            <label>Load capacity <input name="loadKg" placeholder="e.g. 150 KG" required /></label>
+            <label>Brake <input name="brake" placeholder="e.g. Front &amp; Rear Disc" required /></label>
           </div>
-          <label>Max speed <input name="maxSpeed" placeholder="e.g. 45 KM/H" /></label>
+          <label>Max speed <input name="maxSpeed" placeholder="e.g. 45 KM/H" required /></label>
 
           <div class="form-group-title">Price</div>
-          <label>Sale price (₱) <input name="salePrice" placeholder="e.g. 49,000" /></label>
+          <label>Sale price (₱) <input name="salePrice" placeholder="e.g. 49,000" required /></label>
 
           <div class="form-group-title">Contact</div>
-          <label>Contact number <input name="phone" autocomplete="off" placeholder="09XX XXX XXXX" /></label>
+          <label>Contact number <input name="phone" autocomplete="off" placeholder="09XX XXX XXXX" required /></label>
           <label>Add a saved number <select id="posterPhonePick"></select></label>
 
           <div class="form-group-title">Available colours <span class="fg-note">up to 5 — type a colour name (e.g. red) or #hex</span></div>
@@ -357,9 +360,11 @@
           <label>TikTok URL <input name="tiktok" autocomplete="off" /></label>
           <label>Address <input name="address" autocomplete="off" /></label>
           <label>Google Maps link <input name="maps" autocomplete="off" /></label>
-          <p class="form-ok hidden" id="settingsOk">Saved — changes are live.</p>
-          <p class="form-error hidden" id="settingsErr"></p>
-          <button class="btn btn-success" type="submit">Save settings</button>
+          <div class="settings-save-bar">
+            <p class="form-ok hidden" id="settingsOk">Saved — changes are live.</p>
+            <p class="form-error hidden" id="settingsErr"></p>
+            <button class="btn btn-success btn-sm" type="submit">💾 Save settings</button>
+          </div>
         </form>
       </div>
     </section>

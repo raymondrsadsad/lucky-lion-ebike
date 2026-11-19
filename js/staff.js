@@ -24,6 +24,9 @@ function genPassword() {
   return p.join('');
 }
 
+// SRP is a whole-peso amount, max 7 digits (no decimals).
+const srp7 = (v) => Math.min(9999999, Math.max(0, Math.floor(Number(v) || 0)));
+
 /* ---------- #11: motor-watts / battery dropdowns (common values + "Other…") ---------- */
 const MOTOR_W_OPTIONS = [500, 650, 800, 1000, 1200, 1500, 2000, 2500];
 const BATTERY_OPTIONS = ['48V/20AH Lead Acid', '60V/20AH Lead Acid', '60V/30AH Lead Acid', '60V/32AH Lead Acid', '60V/45AH Lead Acid', '60V/65AH Lead Acid'];
@@ -246,11 +249,24 @@ function wirePhoneDigits() {
   const bad = /[^\d+\-() ]/g;
   document.addEventListener('input', e => {
     const t = e.target;
-    if (!t || !t.matches || !t.matches('input[name="phone"], input[name="branchPhone"]')) return;
+    if (!t || !t.matches) return;
+    // +63-prefixed fields (create-user): digits only, drop a country code / leading 0, cap at 10
+    if (t.matches('.phone10')) {
+      let d = t.value.replace(/\D/g, '');
+      if (d.startsWith('63')) d = d.slice(2);
+      if (d.startsWith('0')) d = d.slice(1);
+      d = d.slice(0, 10);
+      if (d !== t.value) { t.value = d; try { t.setSelectionRange(d.length, d.length); } catch { } }
+      return;
+    }
+    if (!t.matches('input[name="phone"], input[name="branchPhone"]')) return;
     const clean = t.value.replace(bad, '');
     if (clean !== t.value) { const p = t.selectionStart; t.value = clean; try { t.setSelectionRange(p - 1, p - 1); } catch { } }
   });
 }
+// +63 phone helpers (shared with app.js's copies): strip to 10 local digits / re-attach +63
+const localPhone = (raw) => { let d = String(raw || '').replace(/\D/g, ''); if (d.startsWith('63')) d = d.slice(2); if (d.startsWith('0')) d = d.slice(1); return d.slice(-10); };
+const fullPhone = (local) => { const d = String(local || '').replace(/\D/g, '').slice(-10); return d ? '+63' + d : ''; };
 
 // staff avatar — photo if set, otherwise an initial-letter placeholder circle
 function avatarImg(u, cls) {
@@ -310,6 +326,20 @@ async function init() {
     const delE = e.target.closest('.del-ebike');
     const addE = e.target.closest('.add-ebike');
     const editBtn = e.target.closest('.unit-edit-btn');
+    const resetBtn = e.target.closest('.reset-pw');
+    if (resetBtn) {
+      // Admin resets anyone; staff reset their own branch's customers. Gated at render time too.
+      const name = resetBtn.dataset.name || 'this user';
+      if (!(await confirmAction(`Reset the password for "${name}"? They'll receive a temporary password and must set a new one at next login.`, { title: 'Reset password', confirmLabel: 'Reset password' }))) return;
+      const temp = genPassword();
+      resetBtn.disabled = true;
+      try {
+        await API.resetPassword(resetBtn.dataset.id, temp);
+        await confirmAction(`Temporary password for ${name}:  ${temp}  —  share it privately. They'll be asked to set their own password at next login.`, { title: '🔑 Password reset', confirmLabel: 'Done', cancelLabel: 'Close' });
+      } catch (ex) { toast('Password reset failed: ' + ex.message, 'err'); }
+      finally { resetBtn.disabled = false; }
+      return;
+    }
     if (delU) {
       const soft = API.trashReady();
       const msg = soft
@@ -318,7 +348,7 @@ async function init() {
       if (!(await confirmAction(msg, { title: soft ? 'Move to Trash' : 'Delete account', confirmLabel: soft ? 'Move to Trash' : 'Delete', danger: true }))) return;
       delU.disabled = true;
       try { await API.deleteUser(delU.dataset.id, delU.dataset.name); await renderUsers(); }
-      catch (ex) { alert('Delete failed: ' + ex.message); delU.disabled = false; }
+      catch (ex) { toast('Delete failed: ' + ex.message, 'err'); delU.disabled = false; }
     } else if (delE) {
       const soft = API.trashReady();
       const label = delE.dataset.label || 'this e-bike';
@@ -326,7 +356,7 @@ async function init() {
       delE.disabled = true;
       const det = delE.closest('details[data-user]');
       try { await API.removeUserEbike(delE.dataset.id, label); if (det) await refreshUnits(det.dataset.user); }
-      catch (ex) { alert('Failed: ' + ex.message); delE.disabled = false; }
+      catch (ex) { toast('Failed: ' + ex.message, 'err'); delE.disabled = false; }
     } else if (addE) {
       const box = addE.closest('.add-unit');
       const detail = readUnitDetail(box);
@@ -342,7 +372,7 @@ async function init() {
         await loadVariants(); await loadStockMeta(); await refreshUnits(addE.dataset.user);
         toast('Unit added.');
       }
-      catch (ex) { alert('Failed: ' + ex.message); addE.disabled = false; }
+      catch (ex) { toast('Failed: ' + ex.message, 'err'); addE.disabled = false; }
     } else if (editBtn) {
       const form = e.target.closest('.unit-row-full').querySelector('.unit-edit-form');
       if (form) form.classList.toggle('hidden');
@@ -1036,13 +1066,17 @@ async function initPoster() {
 
   // template + model pickers
   tmplSel.innerHTML = Poster.templates().map(t => `<option value="${esc(t.key)}">${esc(t.label)}</option>`).join('');
-  modelSel.innerHTML = `<option value="">— choose a model to pre-fill —</option>` +
-    STORE.products.models.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
   if (!ALL_VARIANTS.length) { try { await loadVariants(); } catch { } }
 
   let meta = {}, settings = {};
   try { meta = await API.getModelMeta(); } catch { }
   try { settings = await API.getSettings(); } catch { }
+
+  // model picker = bundled models + any custom (is_custom) models added in Staff → Models
+  const posterModels = STORE.products.models.slice();
+  Object.values(meta).forEach(x => { if (x && x.is_custom && !x.hidden && !posterModels.find(b => b.id === x.id)) posterModels.push({ id: x.id, name: x.name || x.id }); });
+  modelSel.innerHTML = `<option value="">— choose a model to pre-fill —</option>` +
+    posterModels.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
   const branch = homeBranchInfo();
 
   await Poster.placeholder(canvas, tmplSel.value);            // show the flyer itself as the empty state
@@ -1471,7 +1505,7 @@ function modelRow(r, first, last) {
         <details class="model-sub">
           <summary>💵 Price</summary>
           <div class="model-sub-body">
-            <label>Price (SRP) <input name="srp" type="number" value="${numOrEmpty(e.srp)}" /></label>
+            <label>Price (SRP) <input name="srp" type="number" min="0" max="9999999" step="1" inputmode="numeric" value="${numOrEmpty(e.srp)}" /></label>
           </div>
         </details>
 
@@ -1544,9 +1578,9 @@ function paintModelGroup(key = 'models') {
   const del = mgr.deleted || [];
   const deletedHtml = del.length ? `
     <details class="deleted-models">
-      <summary>🗑 Deleted models <span class="pill sm">${del.length}</span></summary>
+      <summary>🗄️ Archive <span class="pill sm">${del.length}</span></summary>
       <div class="deleted-body">
-        <p class="dm-note">Removed from the public store. Restore to bring one back.</p>
+        <p class="dm-note">Archived models are hidden from the public store. Restore to bring one back.</p>
         ${del.map(r => `<div class="dm-row"><span class="dm-name">${nt(effSpecs(r).name)}</span>
           <button class="btn btn-ghost btn-sm restore-model" type="button" data-id="${esc(r.base.id)}">Restore</button></div>`).join('')}
       </div>
@@ -1754,7 +1788,7 @@ function wireModelForms(root = '#modelsList') {
       const patch = {
         name: str(el.mname.value), wheels: el.wheels.value || null,
         motor_w: num(readSpec(el, 'motor_w')), battery: str(readSpec(el, 'battery')), brakes: str(el.brakes.value),
-        srp: num(el.srp.value)
+        srp: srp7(el.srp.value)
       };
       const ok = el.querySelector('.form-ok');
       try { await API.upsertModelMeta(el.dataset.id, patch); ok.classList.remove('hidden'); await refreshModel(el.dataset.id); }
@@ -1763,7 +1797,7 @@ function wireModelForms(root = '#modelsList') {
   });
   // base model → soft-delete via the hidden flag (removed from store + list, restorable below)
   $$(`${root} .remove-model`).forEach(b => b.addEventListener('click', async () => {
-    if (!(await confirmAction(`Delete "${b.dataset.name || 'this model'}"? It's removed from the store. You can restore it from "Deleted models".`, { title: 'Delete model', confirmLabel: 'Delete', danger: true }))) return;
+    if (!(await confirmAction(`Delete "${b.dataset.name || 'this model'}"? It's removed from the store. You can restore it from the Archive.`, { title: 'Delete model', confirmLabel: 'Delete', danger: true }))) return;
     try { await API.upsertModelMeta(b.dataset.id, { hidden: true }); await renderModels(); }
     catch (ex) { alert('Failed: ' + ex.message); }
   }));
@@ -1792,7 +1826,7 @@ function wireAddModel() {
     try {
       await API.upsertModelMeta(id, {
         name: f.get('name'), wheels: f.get('wheels'), motor_w: Number(readSpec(e.target, 'motor_w') || 0),
-        battery: readSpec(e.target, 'battery'), brakes: f.get('brakes'), srp: Number(f.get('srp') || 0),
+        battery: readSpec(e.target, 'battery'), brakes: f.get('brakes'), srp: srp7(f.get('srp')),
         is_custom: true
       });
       // upload the staged photos in the chosen order (first = main card image)
@@ -2442,8 +2476,8 @@ function unitRow(e, canEdit = true) {
         <label>Battery no. <input name="batteryNo" value="${esc(e.battery_no || '')}" /></label>
         <label>Motor no. <input name="motorNo" value="${esc(e.motor_no || '')}" /></label>
       </div>
-      <label>Acquired <input name="acquiredAt" type="date" value="${esc(e.acquired_at || '')}" /></label>
-      <label>Sale note (staff only) <input name="saleNote" value="${esc(e.sale_note || '')}" placeholder="e.g. discount, 6-month Home Credit" /></label>
+      <label>Date acquired <input name="acquiredAt" type="date" value="${esc(e.acquired_at || '')}" /></label>
+      <label>Remarks (staff only) <input name="saleNote" value="${esc(e.sale_note || '')}" placeholder="e.g. discount, 6-month Home Credit" /></label>
       <div class="row-actions"><button class="btn btn-success btn-sm" type="submit">Save unit</button></div>
     </form>` : ''}
   </div>`;
@@ -2470,6 +2504,11 @@ function custRow(u, canEdit = true) {
       <span class="acc-right"><span class="acc-hint">Tap to expand</span><span class="acc-chev">▾</span></span>
     </summary>
     <div class="acc-body">
+      ${canEdit ? `<details class="row-opts"><summary aria-label="User options">⚙ Options</summary>
+        <div class="row-opts-menu">
+          <button type="button" class="btn btn-ghost btn-sm reset-pw" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}">🔑 Reset password</button>
+          <button type="button" class="btn btn-ghost btn-sm danger del-user" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}">🗑 Delete user</button>
+        </div></details>` : ''}
       <div class="b-meta">@${esc(u.username)} · ${esc(u.phone || 'no phone')} · ${esc(u.email || 'no email')}</div>
       <div class="b-meta">${esc(u.address || '—')}</div>
       ${lastRepairLine(u)}
@@ -2486,13 +2525,13 @@ function custRow(u, canEdit = true) {
             <input name="chassisNo" placeholder="Chassis no." />
             <input name="batteryNo" placeholder="Battery no." />
             <input name="motorNo" placeholder="Motor no." />
-            <input name="acquiredAt" type="date" title="Date acquired" value="${todayISO()}" />
-            <input name="saleNote" placeholder="Sale note (staff only)" />
+            <label class="mini-label">Date acquired <input name="acquiredAt" type="date" value="${todayISO()}" /></label>
+            <input name="saleNote" placeholder="Remarks (staff only)" />
           </div>
           <button class="btn btn-ghost btn-sm add-ebike" data-user="${esc(u.id)}">Add unit</button>
         </div>
       </details>` : ''}
-      ${canEdit ? `<button class="btn btn-ghost btn-sm danger del-user" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}" style="margin-top:.7rem">Delete user</button>` : '<div class="b-meta" style="color:var(--muted);margin-top:.5rem">👁 View only — this customer belongs to another branch.</div>'}
+      ${canEdit ? '' : '<div class="b-meta" style="color:var(--muted);margin-top:.5rem">👁 View only — this customer belongs to another branch.</div>'}
     </div>
   </details>`;
 }
@@ -2509,8 +2548,21 @@ function staffRow(u) {
         ${isMe ? '<div class="b-meta" style="color:var(--muted)">— this is you —</div>' : ''}
       </div>
     </div>
-    ${isMe ? '' : `<button class="btn btn-ghost btn-sm danger del-user" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}">Delete</button>`}
+    ${(isMe || !isAdmin()) ? '' : `<div class="staff-actions">
+      <button type="button" class="btn btn-ghost btn-sm reset-pw" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}">🔑 Reset password</button>
+      <button type="button" class="btn btn-ghost btn-sm danger del-user" data-id="${esc(u.id)}" data-name="${esc(u.name || u.username)}">🗑 Delete</button>
+    </div>`}
   </div>`;
+}
+// Staff accounts for the selected branch (admin manages; staff see their branch peers read-only).
+function renderStaffList() {
+  const host = $('#staffList'); if (!host) return;
+  const q = CUST_QUERY.toLowerCase().trim();
+  let list = STAFFS.filter(u => u.branch === USERS_BRANCH);
+  if (q) list = list.filter(u => `${u.name} ${u.username} ${u.memberId} ${u.phone} ${u.email}`.toLowerCase().includes(q));
+  const head = $('#staffHead');
+  if (head) head.innerHTML = `${nt(branchName(USERS_BRANCH))} — Staff (${list.length})`;
+  host.innerHTML = list.map(staffRow).join('') || '<p class="empty-note">No staff accounts in this branch.</p>';
 }
 
 // staff can edit the branch they belong to; admins are read-only oversight everywhere
@@ -2525,6 +2577,7 @@ function renderCustList() {
   const head = $('#custHead');
   if (head) head.innerHTML = `${nt(branchName(USERS_BRANCH))} — Customers (${list.length})${canEdit ? '' : ' · view only'}`;
   $('#custList').innerHTML = list.map(u => custRow(u, canEdit)).join('') || '<p class="empty-note">No customers in this branch.</p>';
+  renderStaffList();
 }
 
 let USERS_BRANCH = null;   // which branch's customers the Users view is showing
@@ -2546,7 +2599,9 @@ async function renderUsers() {
      </div>
      <h3 id="custHead" style="margin:1rem 0 .6rem"></h3>
      <input class="user-search" id="custSearch" type="search" autocomplete="off" aria-label="Search customers" placeholder="Search customers by name, username, ID, phone…" value="${esc(CUST_QUERY)}" />
-     <div class="scroll-list" id="custList"></div>`;
+     <div class="scroll-list" id="custList"></div>
+     <h3 id="staffHead" style="margin:1.4rem 0 .6rem"></h3>
+     <div class="scroll-list" id="staffList"></div>`;
   $('#usersBranchSel').addEventListener('change', e => { USERS_BRANCH = e.target.value; renderCustList(); });
   $('#custSearch').addEventListener('input', e => { CUST_QUERY = e.target.value; renderCustList(); });
   renderCustList();
@@ -2589,6 +2644,7 @@ function paintRepairs() {
   const inScope = repairsInScope();
   const scheduled = inScope.filter(r => r.status !== 'done' && r.status !== 'cancelled').length;
   const done = inScope.filter(r => r.status === 'done' || r.status === 'cancelled').length;
+  const all = inScope.length;
   const branchBar = isAdmin()
     ? `<div class="branch-bar"><label>Branch <select id="repBranchSel">${branchOptionsHtml(REP_BRANCH === 'all' ? '' : REP_BRANCH, { all: true, allLabel: 'All branches' })}</select></label><span class="ro-tag">👁 Admin — all branches</span></div>`
     : `<div class="branch-bar"><span class="b-meta">Showing <strong>${nt(branchName(myBranch()))}</strong> repairs.</span></div>`;
@@ -2603,9 +2659,10 @@ function paintRepairs() {
       ${exportControl('repExport')}
     </div>
     ${cal ? '' : `<div class="seg" role="tablist">
-      <button class="seg-btn ${REP_TAB === 'scheduled' ? 'is-active' : ''}" data-tab="scheduled" role="tab">Scheduled <span class="seg-count">${scheduled}</span></button>
-      <button class="seg-btn ${REP_TAB === 'done' ? 'is-active' : ''}" data-tab="done" role="tab">History <span class="seg-count">${done}</span></button>
-    </div>`}
+      <button class="seg-btn ${REP_TAB === 'scheduled' ? 'is-active' : ''}" data-tab="scheduled" role="tab">Scheduled</button>
+      <button class="seg-btn ${REP_TAB === 'done' ? 'is-active' : ''}" data-tab="done" role="tab">History</button>
+    </div>
+    <div class="rep-count">${REP_TAB === 'scheduled' ? `${scheduled} open repair${scheduled === 1 ? '' : 's'}` : `${all} repair${all === 1 ? '' : 's'} total`}</div>`}
     ${!cal && REP_TAB === 'done' ? `<div class="hist-controls">
       <input class="user-search" id="repSearch" type="search" autocomplete="off" aria-label="Search repair history" placeholder="Search history by customer, model, or service…" value="${esc(REP_QUERY)}" />
       <label class="hist-sort">Sort <select id="repHistSort">
@@ -2742,20 +2799,23 @@ function paintRepairRows() {
     const list = scoped.filter(r => r.status !== 'done' && r.status !== 'cancelled').sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     host.innerHTML = list.map(scheduledRow).join('') || '<p class="empty-note">No scheduled repairs right now. 🎉</p>';
   } else {
+    // History = the FULL record (every status), newest first.
     const q = REP_QUERY.toLowerCase().trim();
-    let list = scoped.filter(r => r.status === 'done' || r.status === 'cancelled');
+    let list = scoped.slice();
     if (q) list = list.filter(r => {
       const m = STORE.modelById(r.modelId);
-      return `${repNameOf(r.userId)} ${m ? m.name : r.modelId} ${r.repairType || ''}`.toLowerCase().includes(q);
+      return `${repNameOf(r.userId)} ${m ? m.name : r.modelId} ${r.repairType || ''} ${r.status || ''}`.toLowerCase().includes(q);
     });
     const histKey = r => r.completedAt || r.date || '';
     list.sort((a, b) => REP_HIST_SORT === 'oldest'
       ? histKey(a).localeCompare(histKey(b))
       : histKey(b).localeCompare(histKey(a)));
-    const total = list.reduce((s, r) => s + (Number(r.cost) || 0), 0);
+    const total = list.filter(r => r.status === 'done').reduce((s, r) => s + (Number(r.cost) || 0), 0);
+    // completed/cancelled → history-style row; still-open ones → scheduled-style row (keeps the right actions)
+    const rowFor = r => (r.status === 'done' || r.status === 'cancelled') ? doneRow(r) : scheduledRow(r);
     host.innerHTML =
-      (list.length ? `<p class="section-lead">${list.length} repair(s)${total ? ` · logged charges: <strong>${peso(total)}</strong>` : ''}</p>` : '') +
-      (list.map(doneRow).join('') || '<p class="empty-note">No completed repairs yet.</p>');
+      (total ? `<p class="section-lead">Logged charges: <strong>${peso(total)}</strong></p>` : '') +
+      (list.map(rowFor).join('') || '<p class="empty-note">No repairs yet.</p>');
   }
   wireRepairRows();
 }
@@ -3022,7 +3082,10 @@ function wireCreate() {
 
   // show the unit-detail fields (colour + serial numbers) once a model is chosen
   const syncDetails = () => {
-    const has = !!(owned.value && roleSel.value === 'customer');
+    const isCust = roleSel.value === 'customer';
+    // #E2: the "E-bike purchased" picker + unit fields are customer-only — hidden for staff
+    const ownedWrap = $('#createOwnedWrap'); if (ownedWrap) ownedWrap.classList.toggle('hidden', !isCust);
+    const has = !!(owned.value && isCust);
     details.classList.toggle('hidden', !has);
     if (has) {
       fillVariantSelect(vsel, owned.value, null);
@@ -3072,8 +3135,10 @@ function wireCreate() {
     const modelId = isCust ? (f.get('ownedModelId') || null) : null;
     try {
       const u = await API.createUser({
-        role, branch, name: f.get('name'), username: f.get('username'), password,
-        phone: f.get('phone'), email: f.get('email'), address: f.get('address'), ownedModelId: modelId
+        role, branch,
+        name: ((f.get('firstName') || '').trim() + ' ' + (f.get('lastName') || '').trim()).trim(),
+        username: f.get('username'), password,
+        phone: fullPhone(f.get('phone')), email: f.get('email'), address: f.get('address'), ownedModelId: modelId
       });
       // record the purchased unit (multi-unit support) with its colour + serials; decrements branch stock
       if (isCust && modelId) {
