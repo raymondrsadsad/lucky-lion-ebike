@@ -117,6 +117,10 @@ const API = (() => {
       if (role === 'admin') throw new Error('Only one administrator account is allowed — a second admin cannot be created.');
       const dup = await req(`/users?username=eq.${encodeURIComponent(data.username.trim())}&select=id`);
       if (dup && dup.length) throw new Error('Username already taken.');
+      // Reject a duplicate email or contact number too (warn + block).
+      const email = (data.email || '').trim(), phone = (data.phone || '').trim();
+      if (email) { const de = await req(`/users?email=eq.${encodeURIComponent(email)}&select=id${nd()}`); if (de && de.length) throw new Error('That email address is already registered.'); }
+      if (phone) { const dp = await req(`/users?phone=eq.${encodeURIComponent(phone)}&select=id${nd()}`); if (dp && dp.length) throw new Error('That contact number is already registered.'); }
       // Admins are global (no branch); staff/customers belong to one branch.
       const branch = role === 'admin' ? null : (data.branch || null);
       // Per-branch, per-role member IDs:
@@ -173,7 +177,11 @@ const API = (() => {
     },
     // #8: staff/admin reset a customer's password to a temporary one → forces a change on next login.
     async resetPassword(id, tempPass) {
-      await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ password: tempPass, must_change_password: true }) });
+      try {
+        await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ password: tempPass, must_change_password: true }) });
+      } catch (e) {   // must_change_password column may not exist yet → just set the password
+        await req(`/users?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ password: tempPass }) });
+      }
       return true;
     },
     // Upload a staff avatar image to the shared 'store-photos' bucket; returns the public URL.
