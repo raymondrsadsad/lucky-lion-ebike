@@ -1671,3 +1671,20 @@ body.logged-in .guest-only { display: none; }
 .act-main{min-width:0}
 .act-text{color:var(--ink);word-break:break-word}
 .act-when{font-size:.8rem;color:var(--muted);margin-top:.1rem}
+
+/* ===== CVSU tester revisions (Nov 2026) ===== */
+/* +63 phone prefix field */
+.phone-field{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:var(--r2,10px);overflow:hidden;background:#fff}
+.phone-field:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.phone-cc{display:flex;align-items:center;padding:0 .6rem;background:var(--accent-soft);color:var(--ink);font-weight:600;border-right:1px solid var(--line);white-space:nowrap}
+.phone-field input{border:0!important;box-shadow:none!important;border-radius:0;flex:1;min-width:0}
+/* product + maintenance search boxes */
+.prod-search,.mnt-search{width:100%;padding:.6rem .8rem;margin:.2rem 0 1rem;border:1px solid var(--line);border-radius:var(--r2,10px);font:inherit}
+.prod-search:focus,.mnt-search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+.mnt-noresult{color:var(--muted);font-style:italic}
+/* highlight an in-progress booking */
+.rep-row.status-in-progress{border-left:4px solid var(--accent);background:var(--accent-soft)}
+.rep-row.status-in-progress .rep-status{color:var(--accent-dark)}
+.rep-row.status-done{border-left:4px solid #16a34a}
+.rep-row.status-cancelled{opacity:.72}
+.pd-inquire{margin-top:.9rem}

@@ -75,7 +75,7 @@
     </div>
     <nav class="drawer-nav" aria-label="Site sections">
       <div class="drawer-group">Browse</div>
-      <a class="drawer-link drawer-navlink" href="#store"><span class="di">🛒</span>Products</a>
+      <a class="drawer-link drawer-navlink" data-cat="all" href="#products"><span class="di">🛒</span>Products</a>
       <a class="drawer-link drawer-navlink" data-cat="4-wheels" href="#products"><span class="di">🚗</span>4 Wheels</a>
       <a class="drawer-link drawer-navlink" data-cat="3-wheels" href="#products"><span class="di">🛺</span>3 Wheels</a>
       <a class="drawer-link drawer-navlink" data-cat="2-wheels" href="#products"><span class="di">🏍️</span>2 Wheels</a>
@@ -92,6 +92,8 @@
       <button class="drawer-link member-only" data-panel="tips"><span class="di">💡</span>Tips</button>
       <button class="drawer-link member-only" data-panel="roadrules"><span class="di">🛑</span>Road Rules</button>
       <button class="drawer-link member-only" data-panel="schedule"><span class="di">🗓️</span>Schedule Repair</button>
+      <button class="drawer-link member-only" data-panel="bookings"><span class="di">📑</span>Your Bookings</button>
+      <button class="drawer-link member-only" data-panel="reviews"><span class="di">⭐</span>My Reviews</button>
     </nav>
   </aside>
 
@@ -129,6 +131,7 @@
       <h2 class="section-title">Our Products</h2>
       <p class="section-lead">The full Lucky Lion lineup. Tap any unit for photos, colours, and specs.</p>
       <div class="products-tabs" id="productsTabs"><!-- category tabs, filled by app.js --></div>
+      <input type="search" id="productsSearch" class="prod-search" placeholder="🔎 Search products by name…" aria-label="Search products" />
       <div id="productsGrid"><!-- filled by app.js --></div>
     </section>
 
@@ -233,18 +236,21 @@
       <h3 class="modal-title">Create your account</h3>
       <p class="modal-note">Join to book repairs, track your e-bikes, and message the branch directly.</p>
       <form id="signupForm" class="form">
-        <label>Full name <input name="name" autocomplete="name" required /></label>
+        <div class="grid2">
+          <label>First name <input name="firstName" autocomplete="given-name" required /></label>
+          <label>Last name <input name="lastName" autocomplete="family-name" required /></label>
+        </div>
         <label>Username <input name="username" autocomplete="username" required /></label>
         <label>Password <input name="password" type="password" autocomplete="new-password" required minlength="8" pattern="(?=.*[A-Z])(?=.*\d).{8,}" title="At least 8 characters, with one uppercase letter and one number." /></label>
         <p class="pw-hint">At least 8 characters, 1 uppercase letter and 1 number.</p>
         <label class="checkbox chk-show"><input type="checkbox" id="signupShowPass" /> Show password</label>
         <div class="grid2">
-          <label>Phone <input name="phone" autocomplete="tel" inputmode="numeric" /></label>
-          <label>Email <input name="email" type="email" autocomplete="email" /></label>
+          <label>Phone <span class="phone-field"><span class="phone-cc">+63</span><input name="phone" autocomplete="tel" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX" required /></span></label>
+          <label>Email <input name="email" type="email" autocomplete="email" required /></label>
         </div>
         <label>Address <input name="address" autocomplete="street-address" /></label>
-        <label>Nearest branch <select name="branch" id="signupBranch" required>
-          <option value="" selected disabled>— choose the branch nearest you —</option>
+        <label>Branch <select name="branch" id="signupBranch" required>
+          <option value="" selected disabled>— choose a branch —</option>
         </select></label>
         <p class="form-error hidden" id="signupError"></p>
         <button type="submit" class="btn btn-primary full">Create account</button>

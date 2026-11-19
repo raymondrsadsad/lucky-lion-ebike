@@ -150,14 +150,29 @@ const modelById2 = (id) => MODELS.find(m => m.id === id) || STORE.modelById(id);
 
 document.addEventListener('DOMContentLoaded', init);
 
-// #4: contact-number fields (sign-up, profile) accept digits + usual separators only — block letters
+// Phone fields show a fixed +63 prefix and accept the 10 local digits only.
+// localPhone strips any country code / leading 0 and keeps the last 10 digits (for prefilling
+// existing numbers like 0917…); fullPhone re-attaches the +63 for storage / tap-to-call.
+function localPhone(raw) {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.startsWith('63')) d = d.slice(2);
+  if (d.startsWith('0')) d = d.slice(1);
+  return d.slice(-10);
+}
+function fullPhone(local) {
+  const d = String(local || '').replace(/\D/g, '').slice(-10);
+  return d ? '+63' + d : '';
+}
+// Phone inputs accept digits only, drop a leading country code / 0, and cap at 10 digits.
 function wirePhoneDigits() {
-  const bad = /[^\d+\-() ]/g;
   document.addEventListener('input', e => {
     const t = e.target;
     if (!t || !t.matches || !t.matches('input[name="phone"]')) return;
-    const clean = t.value.replace(bad, '');
-    if (clean !== t.value) { const p = t.selectionStart; t.value = clean; try { t.setSelectionRange(p - 1, p - 1); } catch { } }
+    let d = t.value.replace(/\D/g, '');
+    if (d.startsWith('63')) d = d.slice(2);
+    if (d.startsWith('0')) d = d.slice(1);
+    d = d.slice(0, 10);
+    if (d !== t.value) { t.value = d; try { t.setSelectionRange(d.length, d.length); } catch { } }
   });
 }
 
@@ -644,11 +659,13 @@ function buildStoreSubmenu(cats) {
 
 /* ---------------- full Products listing (in-page "page" at #products, NWOW-style) ---------------- */
 let PRODUCTS_CAT = 'all';
+let PRODUCTS_Q = '';
 function renderProducts() {
   const grid = $('#productsGrid'); if (!grid) return;
   const cats = STORE.products.categories;
   const bySort = (a, b) => (a.sort || 0) - (b.sort || 0);
-  const inCat = (key) => MODELS.filter(m => m.wheels === key).sort(bySort);
+  const matchQ = (m) => !PRODUCTS_Q || (m.name || '').toLowerCase().includes(PRODUCTS_Q);
+  const inCat = (key) => MODELS.filter(m => m.wheels === key && matchQ(m)).sort(bySort);
 
   // tab bar (All + each wheel category)
   const tabs = $('#productsTabs');
@@ -675,12 +692,14 @@ function renderProducts() {
       ? `<div class="model-grid">${rows.map(modelCard).join('')}</div>`
       : `<p class="section-lead">No units in this category yet.</p>`;
   }
-  grid.innerHTML = html || `<p class="section-lead">Products coming soon — please contact the branch.</p>`;
+  grid.innerHTML = html || `<p class="section-lead">${PRODUCTS_Q ? 'No products match “' + esc(PRODUCTS_Q) + '”.' : 'Products coming soon — please contact the branch.'}</p>`;
   $$('.model-card', grid).forEach(b => b.addEventListener('click', () => openModel(b.dataset.model)));
 }
 function wireProducts() {
   const back = $('#productsBack');
   if (back) back.addEventListener('click', () => { location.hash = '#store'; });
+  const search = $('#productsSearch');
+  if (search) search.addEventListener('input', () => { PRODUCTS_Q = search.value.trim().toLowerCase(); renderProducts(); });
   window.addEventListener('hashchange', syncProductsRoute);
   syncProductsRoute();
 }
@@ -763,6 +782,7 @@ function renderProductDetail(id) {
         ${picker}
         <p>${esc(m.name)} — a ${m.motorW}W ${esc(label).toLowerCase()} electric vehicle from Lucky Lion,
            built for reliable everyday travel around Cavite.</p>
+        <button type="button" class="btn btn-primary pd-inquire" id="pdInquire">📞 Inquire now</button>
       </div>
     </div>
     <table class="spec-table">
@@ -776,6 +796,10 @@ function renderProductDetail(id) {
     <p class="md-note">Payment: ${esc(STORE.products._payment.join(', '))}. ${esc(STORE.products._delivery)}. Prices subject to change without prior notice.${m._note ? ' — ' + esc(m._note) : ''}</p>`;
 
   wireGallery(imgsFor(sel));
+
+  // "Inquire now" → open the branch contact picker (store / sales line)
+  const inq = $('#pdInquire');
+  if (inq) inq.addEventListener('click', () => openContactPicker('store'));
 
   // picking a colour swaps the gallery to that colour's photos
   if (hasVariants) {
@@ -926,7 +950,8 @@ function wireLogin() {
   $('#loginBtn').addEventListener('click', () => { closePublicDrawer(); showModal('#loginModal'); });
   $('#forgotLink').addEventListener('click', e => {
     e.preventDefault();
-    alert('Please contact your nearest Lucky Lion branch to reset your password.');
+    const n = primaryNumber();
+    toast('To reset your password, please contact your Lucky Lion branch' + (n ? ' at ' + n : '') + '.');
   });
   const lsp = $('#loginShowPass');
   if (lsp) lsp.addEventListener('change', () => { $('#loginPass').type = lsp.checked ? 'text' : 'password'; });
@@ -1015,7 +1040,7 @@ function wireSignup() {
   const openLogin = () => { hideModal($('#signupModal')); showModal('#loginModal'); };
   // populate the nearest-branch dropdown from the canonical branch list
   const branchSel = $('#signupBranch');
-  if (branchSel) branchSel.innerHTML = `<option value="" selected disabled>— choose the branch nearest you —</option>` + branchOptionsHtml('');
+  if (branchSel) branchSel.innerHTML = `<option value="" selected disabled>— choose a branch —</option>` + branchOptionsHtml('');
   $('#signupBtn').addEventListener('click', () => { closePublicDrawer(); showModal('#signupModal'); });
   const toSignup = $('#toSignupLink'); if (toSignup) toSignup.addEventListener('click', e => { e.preventDefault(); openSignup(); });
   const toLogin = $('#toLoginLink'); if (toLogin) toLogin.addEventListener('click', e => { e.preventDefault(); openLogin(); });
@@ -1027,23 +1052,25 @@ function wireSignup() {
     const f = new FormData(e.target);
     const username = (f.get('username') || '').trim(), password = f.get('password');
     const branch = f.get('branch') || '';
-    if (!branch) { err.textContent = 'Please choose the branch nearest you.'; err.classList.remove('hidden'); return; }
+    const name = ((f.get('firstName') || '').trim() + ' ' + (f.get('lastName') || '').trim()).trim();
+    if (!branch) { err.textContent = 'Please choose a branch.'; err.classList.remove('hidden'); return; }
     const pwErr = validatePassword(password);
     if (pwErr) { err.textContent = pwErr; err.classList.remove('hidden'); return; }
     if (!(await confirmAction('Create your Lucky Lion account with these details?', { title: 'Create account', confirmLabel: 'Create account' }))) return;
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try {
       await API.createUser({
-        role: 'customer', branch, name: (f.get('name') || '').trim(), username, password,
-        phone: (f.get('phone') || '').trim(), email: (f.get('email') || '').trim(), address: (f.get('address') || '').trim(),
+        role: 'customer', branch, name, username, password,
+        phone: fullPhone(f.get('phone')), email: (f.get('email') || '').trim(), address: (f.get('address') || '').trim(),
         mustChange: false   // #8: self-signup picks their own password → no forced change
       });
-      await API.login(username, password, true);      // sign them straight in
+      // Per tester request: do NOT auto-login — confirm success and send them back to log in.
       hideModal($('#signupModal'));
       e.target.reset();
-      await refreshAuthUI();
-      location.hash = '#account';   // new customer lands on their dashboard
-      toast(`Welcome to Lucky Lion, ${f.get('name') || username}! 🎉`);
+      toast(`Account created, ${name || username}! Please log in with your new details. 🎉`);
+      const lu = $('#loginUser'); if (lu) lu.value = username;   // prefill the username for convenience
+      showModal('#loginModal');
+      const lp = $('#loginPass'); if (lp) lp.focus();
     } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
     finally { btn.disabled = false; }
   });
@@ -1233,11 +1260,15 @@ async function openPanel(kind) {
   else if (kind === 'tips') body.innerHTML = panelTips();
   else if (kind === 'roadrules') body.innerHTML = panelRoadRules();
   else if (kind === 'schedule') body.innerHTML = await panelSchedule(user);
+  else if (kind === 'bookings') body.innerHTML = await panelBookings(user);
+  else if (kind === 'reviews') body.innerHTML = await panelReviews(user);
   else if (kind === 'maintenance') body.innerHTML = panelMaintenance();
   showModal('#panelModal');
   if (kind === 'profile') wireProfile(user);
   if (kind === 'schedule') wireSchedule(user);
+  if (kind === 'bookings' || kind === 'reviews') wireBookings(user);
   if (kind === 'messages') wireMessages(user);
+  if (kind === 'maintenance') wireMaintenanceSearch();
 }
 
 /* ---------------- messaging (customer ↔ branch) ---------------- */
@@ -1418,7 +1449,9 @@ function panelMaintenance() {
       </details>`;
     return `<h3 class="panel-title">${esc(mnt.heading)}</h3>
       <p class="panel-sub">${esc(mnt.intro)}</p>
+      <input type="search" id="mntSearch" class="mnt-search" placeholder="🔎 Search maintenance topics…" aria-label="Search maintenance" />
       <div class="mnt-articles">${arts.map(articleBlock).join('')}</div>
+      <p class="mnt-noresult hidden" id="mntNoResult">No maintenance topics match your search.</p>
       ${mnt.source ? `<p class="mnt-source">ℹ️ ${esc(mnt.source)}</p>` : ''}`;
   }
   // Legacy fallback: Basic/Detailed category lists from an older content.json.
@@ -1442,6 +1475,22 @@ function panelMaintenance() {
     ${section('🔧', 'Detailed Maintenance', 'Thorough checks and the steps to take.', detailed)}
     ${legacy.map(catBlock).join('')}
     ${mnt.source ? `<p class="mnt-source">ℹ️ ${esc(mnt.source)}</p>` : ''}`;
+}
+// filter the maintenance accordion by title/body as the customer types
+function wireMaintenanceSearch() {
+  const box = $('#mntSearch'); if (!box) return;
+  const arts = $$('#panelBody .mnt-article');
+  const none = $('#mntNoResult');
+  box.addEventListener('input', () => {
+    const q = box.value.trim().toLowerCase();
+    let shown = 0;
+    arts.forEach(a => {
+      const hit = !q || a.textContent.toLowerCase().includes(q);
+      a.classList.toggle('hidden', !hit);
+      if (hit) shown++;
+    });
+    if (none) none.classList.toggle('hidden', shown > 0);
+  });
 }
 
 function panelTips() {
@@ -1492,7 +1541,7 @@ async function panelProfile(user) {
     <form class="form" id="profileForm">
       <label>Full name <input name="name" value="${esc(user.name)}" required /></label>
       <label>Email <input name="email" type="email" value="${esc(user.email)}" /></label>
-      <label>Phone <input name="phone" value="${esc(user.phone)}" inputmode="numeric" required /></label>
+      <label>Phone <span class="phone-field"><span class="phone-cc">+63</span><input name="phone" value="${esc(localPhone(user.phone))}" inputmode="numeric" maxlength="10" placeholder="9XXXXXXXXX" required /></span></label>
       <label>Address <input name="address" value="${esc(user.address)}" required /></label>
       <label>Nearest branch <select name="branch" required>${branchOptionsHtml(user.branch)}</select></label>
       <p class="form-ok hidden" id="profOk">Saved.</p>
@@ -1530,7 +1579,7 @@ function wireProfile(user) {
     e.preventDefault();
     if (!(await confirmAction('Save these changes to your profile?', { title: 'Save profile', confirmLabel: 'Save changes' }))) return;
     const f = new FormData(e.target);
-    await API.updateUser(user.id, { name: f.get('name'), email: f.get('email'), phone: f.get('phone'), address: f.get('address'), branch: f.get('branch') || user.branch });
+    await API.updateUser(user.id, { name: f.get('name'), email: f.get('email'), phone: fullPhone(f.get('phone')), address: f.get('address'), branch: f.get('branch') || user.branch });
     user.name = f.get('name');
     $('#profOk').classList.remove('hidden');
     $('#memberName').textContent = `Hi, ${f.get('name') || user.username}`;
@@ -1562,16 +1611,12 @@ async function panelSchedule(user) {
   if (!owned.length && user.ownedModelId) { owned = [user.ownedModelId]; MY_EBIKES = [{ model_id: user.ownedModelId }]; }
   const myModels = [...new Set(owned)].map(id => modelById2(id)).filter(Boolean);
 
-  const bookings = `<h4 style="margin:1.4rem 0 .6rem">Your bookings</h4>
-    <div id="myReps">${renderMyReps(mine)}</div>`;
-
   if (!myModels.length) {
     return `<h3 class="panel-title">Schedule Repair</h3>
       <p class="panel-sub">Book a repair / home visit.</p>
       <div class="placeholder-box">No e-bike is linked to your account yet, so there's nothing to book a repair for.
         <br><small>Please contact the Lucky Lion branch so they can add your unit.</small></div>
-      <div class="msg-cta">Have a question? <button type="button" class="link-btn" id="msgBranchBtn">💬 Message the branch →</button></div>
-      ${bookings}`;
+      <div class="msg-cta">Have a question? <button type="button" class="link-btn" id="msgBranchBtn">💬 Message the branch →</button></div>`;
   }
 
   return `<h3 class="panel-title">Schedule Repair</h3>
@@ -1604,7 +1649,58 @@ async function panelSchedule(user) {
       <p class="form-error hidden" id="repErr"></p>
       <button class="btn btn-primary full" type="submit">Book repair</button>
     </form>
-    ${bookings}`;
+    <p class="panel-sub" style="margin-top:1rem">📑 See all your bookings under <strong>Your Bookings</strong> in the menu.</p>`;
+}
+
+/* ---------- Your Bookings + My Reviews (split out of Schedule Repair) ---------- */
+async function panelBookings(user) {
+  let mine = [];
+  try { mine = await API.getRepairsByUser(user.id); } catch { }
+  try { MY_EBIKES = await API.getUserEbikes(user.id); } catch { }
+  return `<h3 class="panel-title">📑 Your Bookings</h3>
+    <p class="panel-sub">Every repair you've booked with Lucky Lion, with its current status.</p>
+    <div id="myReps">${renderMyReps(mine)}</div>`;
+}
+async function panelReviews(user) {
+  let reps = [];
+  try { reps = await API.getRepairsByUser(user.id); } catch { }
+  try { MY_EBIKES = await API.getUserEbikes(user.id); } catch { }
+  const done = reps.filter(r => r.status === 'done');
+  const body = done.length
+    ? `<div id="myReps">${renderMyReps(done)}</div>`
+    : `<p class="panel-sub">You have no completed repairs to review yet. Once a repair is marked done, you can rate it here. ⭐</p>`;
+  return `<h3 class="panel-title">⭐ My Reviews</h3>
+    <p class="panel-sub">Rate your completed repairs and read the reviews you've left.</p>
+    ${body}`;
+}
+// shared wiring for the #myReps list (message / call / star rating / submit review)
+function wireBookings(user) {
+  const myReps = $('#myReps');
+  if (!myReps) return;
+  myReps.addEventListener('click', async e => {
+    if (e.target.closest('.book-msg')) { openPanel('messages'); return; }
+    if (e.target.closest('.book-call')) { openContactPicker('repairs'); return; }
+    const star = e.target.closest('.star');
+    if (star) {
+      const box = star.closest('.review-box'); if (!box) return;
+      const val = Number(star.dataset.val);
+      box.dataset.rating = String(val);
+      box.querySelectorAll('.star').forEach(s => s.classList.toggle('on', Number(s.dataset.val) <= val));
+      return;
+    }
+    if (e.target.closest('.rev-submit')) {
+      const box = e.target.closest('.review-box'); if (!box) return;
+      const repId = box.dataset.rep, rating = Number(box.dataset.rating || 0);
+      const err = box.querySelector('.rev-err');
+      if (!rating) { err.textContent = 'Please tap a star rating first.'; err.classList.remove('hidden'); return; }
+      const review = (box.querySelector('.rev-comment') || {}).value || '';
+      try {
+        await API.submitReview(repId, { rating, review });
+        toast('Thanks for your review! ⭐');
+        myReps.innerHTML = renderMyReps(await API.getRepairsByUser(user.id));
+      } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+    }
+  });
 }
 
 /* ---------- #15: reminder when a booking is coming up ---------- */
@@ -1696,8 +1792,9 @@ function renderMyReps(list) {
         </div>`;
       }
     }
-    return `<div class="branch"><div><h3>${esc(m ? m.name : r.modelId)}</h3>
-      <div class="b-meta">${esc(r.date)} · ${esc(r.timeSlot)} · status: <strong>${esc(r.status)}</strong></div>
+    const statusCls = 'rep-row status-' + String(r.status || '').replace(/[^a-z-]/gi, '');
+    return `<div class="branch ${statusCls}"><div><h3>${esc(m ? m.name : r.modelId)}</h3>
+      <div class="b-meta">${esc(r.date)} · ${esc(r.timeSlot)} · status: <strong class="rep-status">${esc(r.status)}</strong></div>
       ${r.repairType ? `<div class="b-meta">🔧 ${esc(r.repairType)}</div>` : ''}
       ${bits.length ? `<div class="b-meta">${bits.map(esc).join(' · ')}</div>` : ''}
       ${r.notes ? `<div class="b-meta">${esc(r.notes)}</div>` : ''}
@@ -1729,50 +1826,34 @@ async function paintSlots(date) {
   try { taken = (await API.getBookedSlots(date)).map(b => b.slot); }
   catch { hint.textContent = "Couldn't check availability — please try again."; return; }
 
-  const free = REPAIR_SLOTS.filter(s => !taken.includes(s));
+  // When booking for TODAY, a slot whose start time has already passed can't be chosen.
+  const isToday = date === todayISOlocal();
+  const now = new Date();
+  const isPastSlot = (s) => {
+    if (!isToday) return false;
+    const m = s.match(/^(\d{1,2}):(\d{2})/); if (!m) return false;
+    const start = new Date(); start.setHours(+m[1], +m[2], 0, 0);
+    return start <= now;
+  };
+
+  const free = REPAIR_SLOTS.filter(s => !taken.includes(s) && !isPastSlot(s));
   sel.innerHTML = REPAIR_SLOTS.map(s => {
     const isTaken = taken.includes(s);
-    return `<option value="${esc(s)}"${isTaken ? ' disabled' : ''}>${esc(s)}${isTaken ? ' — TAKEN' : ''}</option>`;
+    const isPast = isPastSlot(s);
+    const label = esc(s) + (isPast ? ' — PAST' : (isTaken ? ' — TAKEN' : ''));
+    return `<option value="${esc(s)}"${(isTaken || isPast) ? ' disabled' : ''}>${label}</option>`;
   }).join('');
   sel.value = free[0] || '';
   sel.disabled = !free.length;
   hint.classList.toggle('is-full', !free.length);
   hint.textContent = free.length
-    ? `${free.length} of ${REPAIR_SLOTS.length} slots open on this date. Taken slots can't be picked.`
-    : 'All slots are booked on this date — please choose another day.';
+    ? `${free.length} of ${REPAIR_SLOTS.length} slots open on this date. Taken or past slots can't be picked.`
+    : (isToday ? 'No more slots available today — please choose another day.' : 'All slots are booked on this date — please choose another day.');
 }
 
 function wireSchedule(user) {
   const mb = $('#msgBranchBtn');
   if (mb) mb.addEventListener('click', () => openPanel('messages'));
-  // per-booking "message the branch" buttons (delegated — #myReps re-renders after booking)
-  const myReps = $('#myReps');
-  if (myReps) myReps.addEventListener('click', async e => {
-    if (e.target.closest('.book-msg')) { openPanel('messages'); return; }
-    if (e.target.closest('.book-call')) { openContactPicker('repairs'); return; }   // scheduled repair → repairs line
-    // #9: star rating picker
-    const star = e.target.closest('.star');
-    if (star) {
-      const box = star.closest('.review-box'); if (!box) return;
-      const val = Number(star.dataset.val);
-      box.dataset.rating = String(val);
-      box.querySelectorAll('.star').forEach(s => s.classList.toggle('on', Number(s.dataset.val) <= val));
-      return;
-    }
-    // #9: submit the review
-    if (e.target.closest('.rev-submit')) {
-      const box = e.target.closest('.review-box'); if (!box) return;
-      const repId = box.dataset.rep, rating = Number(box.dataset.rating || 0);
-      const err = box.querySelector('.rev-err');
-      if (!rating) { err.textContent = 'Please tap a star rating first.'; err.classList.remove('hidden'); return; }
-      const review = (box.querySelector('.rev-comment') || {}).value || '';
-      try {
-        await API.submitReview(repId, { rating, review });
-        toast('Thanks for your review! ⭐');
-        myReps.innerHTML = renderMyReps(await API.getRepairsByUser(user.id));
-      } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
-    }
-  });
   const form = $('#repForm');
   if (!form) return;                 // no owned e-bike → no booking form to wire
 
@@ -1829,6 +1910,5 @@ function wireSchedule(user) {
     const hidden = $('#repDate'); if (hidden) hidden.value = '';
     await paintSlots('');
     await renderBookingCalendar();   // reflect the new booking (day may now be fuller/full)
-    $('#myReps').innerHTML = renderMyReps(await API.getRepairsByUser(user.id));
   });
 }
