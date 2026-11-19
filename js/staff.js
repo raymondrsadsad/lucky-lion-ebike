@@ -403,7 +403,7 @@ async function init() {
       await API.updateUserEbike(form.dataset.id, { modelId: form.dataset.model, ...detail });
       if (det) await refreshUnits(det.dataset.user);
       toast('Unit details saved.');
-    } catch (ex) { alert('Save failed: ' + ex.message); }
+    } catch (ex) { toast('Save failed: ' + ex.message); }
   });
   $('#logoutBtn').addEventListener('click', async () => { await API.logout(); window.location.href = 'index.html'; });
   wireStaffMenu(me);
@@ -869,7 +869,36 @@ async function renderAdminDashboard() {
 }
 
 /* ================= ADMIN ANALYTICS (deep per-branch performance) ================= */
-let ANALYTICS_RANGE = '30';   // today | 7 | 30 | all
+let ANALYTICS_RANGE = '30';   // today | 7 | 30 | all | custom
+let ANALYTICS_FROM = '', ANALYTICS_TO = '';
+// the active [start,end] window + the equal-length window immediately before it (for % trend)
+function analyticsWindow() {
+  const end = (ANALYTICS_RANGE === 'custom' && ANALYTICS_TO) ? ANALYTICS_TO : today10();
+  let start;
+  if (ANALYTICS_RANGE === 'custom') start = ANALYTICS_FROM || end;
+  else if (ANALYTICS_RANGE === 'all') start = '0000-00-00';
+  else start = rangeStart(ANALYTICS_RANGE);
+  return { start, end };
+}
+function prevWindow(w) {
+  if (!w || w.start === '0000-00-00') return null;
+  const s = new Date(w.start + 'T00:00:00'), e = new Date(w.end + 'T00:00:00');
+  if (isNaN(s) || isNaN(e)) return null;
+  const len = Math.round((e - s) / 86400000) + 1;
+  const pe = new Date(s); pe.setDate(pe.getDate() - 1);
+  const ps = new Date(pe); ps.setDate(ps.getDate() - (len - 1));
+  const iso = d => d.toISOString().slice(0, 10);
+  return { start: iso(ps), end: iso(pe) };
+}
+const inWin = (dateStr, w) => { const d = String(dateStr || '').slice(0, 10); return !!d && d >= w.start && d <= w.end; };
+// ▲ up (green) / ▼ down (red) / — flat, comparing this period's completed repairs to the previous one
+function trendCell(cur, prev, hasPrev) {
+  if (!hasPrev) return '<span class="trend flat">—</span>';
+  if (prev === 0) return cur > 0 ? '<span class="trend up">▲ new</span>' : '<span class="trend flat">—</span>';
+  const p = Math.round((cur - prev) / prev * 100);
+  if (p === 0) return '<span class="trend flat">0%</span>';
+  return `<span class="trend ${p > 0 ? 'up' : 'down'}">${p > 0 ? '▲' : '▼'} ${Math.abs(p)}%</span>`;
+}
 async function renderAnalytics() {
   const host = $('#analyticsBody'); if (!host) return;
   if (!isAdmin()) { host.innerHTML = '<p class="section-lead">Admins only.</p>'; return; }
@@ -881,20 +910,24 @@ async function renderAnalytics() {
   try { const us = await API.getUsers(); REP_USERS = {}; us.forEach(u => REP_USERS[u.id] = u); CUSTOMERS = us.filter(u => u.role === 'customer'); STAFFS = us.filter(u => u.role === 'staff'); } catch { }
   let msgs = []; try { msgs = await API.getAllMessages(); } catch { }
 
-  const range = ANALYTICS_RANGE, start = rangeStart(range);
+  const range = ANALYTICS_RANGE, win = analyticsWindow(), prev = prevWindow(win), hasPrev = !!prev;
+  const rLabel = range === 'custom' ? `${win.start} → ${win.end}` : RANGE_LABEL[range];
   const unreadByBranch = {};
   msgs.filter(m => m.sender === 'customer' && !m.read).forEach(m => { const b = branchOfUser(m.userId); unreadByBranch[b] = (unreadByBranch[b] || 0) + 1; });
 
   const rows = BRANCHES.map(b => {
     const k = b.key;
     const bReps = REPAIRS.filter(r => branchOfUser(r.userId) === k);
+    const doneCur = bReps.filter(r => r.status === 'done' && inWin(r.completedAt || r.date, win)).length;
+    const donePrev = hasPrev ? bReps.filter(r => r.status === 'done' && inWin(r.completedAt || r.date, prev)).length : 0;
     return {
       key: k, name: b.name, short: b.short,
       customers: CUSTOMERS.filter(c => c.branch === k).length,
       today: bReps.filter(r => r.date === today10()).length,
       open: bReps.filter(r => r.status !== 'done' && r.status !== 'cancelled').length,
-      done: bReps.filter(r => r.status === 'done' && inRangeDate(r.completedAt || r.date, start)).length,
-      cancelled: bReps.filter(r => r.status === 'cancelled' && inRangeDate(r.date, start)).length,
+      done: doneCur, donePrev,
+      trendPct: hasPrev ? (donePrev === 0 ? (doneCur > 0 ? 100 : 0) : Math.round((doneCur - donePrev) / donePrev * 100)) : null,
+      cancelled: bReps.filter(r => r.status === 'cancelled' && inWin(r.date, win)).length,
       overdue: bReps.filter(r => r.status !== 'done' && r.status !== 'cancelled' && r.date && r.date < today10()).length,
       unread: unreadByBranch[k] || 0
     };
@@ -917,7 +950,7 @@ async function renderAnalytics() {
 
   const chart = `
     <div class="dash-card">
-      <div class="dc-head"><h3>Repairs completed by branch</h3><span class="b-meta">${RANGE_LABEL[range]}</span></div>
+      <div class="dc-head"><h3>Repairs completed by branch</h3><span class="b-meta">${rLabel}</span></div>
       <div class="chart-rows">
         ${chartRows.map(r => `
           <div class="chart-row" title="${esc(r.name)}: ${r.done} completed">
@@ -933,14 +966,22 @@ async function renderAnalytics() {
       <td data-label="Customers" data-nav="users">${r.customers}</td>
       <td data-label="Open" class="grp-start" data-nav="repairs">${r.open}</td>
       <td data-label="Done" class="ok-num" data-nav="repairs">${r.done}</td>
+      <td data-label="Trend">${trendCell(r.done, r.donePrev, hasPrev)}</td>
       <td data-label="Cancelled" class="muted-num" data-nav="repairs">${r.cancelled}</td>
       <td data-label="Overdue" class="${r.overdue ? 'is-warn' : ''}" data-nav="repairs">${r.overdue}</td>
       <td data-label="Unread" class="grp-start ${r.unread ? 'is-warn' : ''}" data-nav="inbox">${r.unread}</td>
     </tr>`).join('');
 
   host.innerHTML = `
-    <p class="section-lead">Repairs &amp; customer messages across all branches. The range applies to <em>completed</em> and <em>cancelled</em> repairs.</p>
-    <div class="seg" role="tablist" style="margin-bottom:1rem">${seg('today', 'Today')}${seg('7', '7 days')}${seg('30', '30 days')}${seg('all', 'All time')}</div>
+    <p class="section-lead">Repairs &amp; customer messages across all branches. The range applies to <em>completed</em> and <em>cancelled</em> repairs; <strong>Trend</strong> compares completed repairs to the previous period.</p>
+    <div class="ana-toolbar">
+      <div class="seg" role="tablist">${seg('today', 'Today')}${seg('7', '7 days')}${seg('30', '30 days')}${seg('all', 'All time')}${seg('custom', 'Custom')}</div>
+      ${exportControl('anaExport')}
+    </div>
+    <div class="ana-custom${range === 'custom' ? '' : ' hidden'}">
+      <label>From <input type="date" id="anaFrom" value="${esc(ANALYTICS_FROM)}" max="${today10()}" /></label>
+      <label>To <input type="date" id="anaTo" value="${esc(ANALYTICS_TO)}" max="${today10()}" /></label>
+    </div>
 
     <div class="tile-row">
       ${tile('✅', totDone, 'Repairs completed')}
@@ -970,19 +1011,20 @@ async function renderAnalytics() {
     </div>` : ''}
 
     <div class="dash-card">
-      <div class="dc-head"><h3>Per-branch breakdown</h3><span class="b-meta">${RANGE_LABEL[range]}</span></div>
+      <div class="dc-head"><h3>Per-branch breakdown</h3><span class="b-meta">${rLabel}</span></div>
       <div class="admin-table-wrap">
         <table class="admin-table admin-grouped">
           <thead>
             <tr class="grp">
               <th class="blank"></th><th class="blank"></th>
-              <th class="grp-start" colspan="4">🛠️ Repairs (${RANGE_LABEL[range]})</th>
+              <th class="grp-start" colspan="5">🛠️ Repairs (${rLabel})</th>
               <th class="grp-start">💬</th>
             </tr>
             <tr>
               <th>Branch</th><th>Customers</th>
               <th class="grp-start" title="Repairs awaiting or in progress">Open</th>
               <th title="Repairs finished in range">Done</th>
+              <th title="Completed vs the previous period">Trend</th>
               <th title="Repairs cancelled in range">Cancelled</th>
               <th title="Open repairs past their date">Overdue</th>
               <th class="grp-start" title="Unread customer messages">Unread</th>
@@ -994,6 +1036,20 @@ async function renderAnalytics() {
     </div>`;
 
   $$('#analyticsBody .seg-btn').forEach(b => b.addEventListener('click', () => { ANALYTICS_RANGE = b.dataset.range; renderAnalytics(); }));
+  const af = $('#anaFrom'), at = $('#anaTo');
+  if (af) af.addEventListener('change', () => { ANALYTICS_FROM = af.value; ANALYTICS_RANGE = 'custom'; renderAnalytics(); });
+  if (at) at.addEventListener('change', () => { ANALYTICS_TO = at.value; ANALYTICS_RANGE = 'custom'; renderAnalytics(); });
+  wireExport('anaExport', () => ({
+    title: 'Branch Analytics',
+    rows: rows.map(r => ({
+      branch: r.name, customers: r.customers, open: r.open, done: r.done,
+      trend: hasPrev ? ((r.trendPct > 0 ? '+' : '') + r.trendPct + '%') : '—',
+      cancelled: r.cancelled, overdue: r.overdue, unread: r.unread
+    })),
+    columns: [{ key: 'branch', label: 'Branch' }, { key: 'customers', label: 'Customers' }, { key: 'open', label: 'Open' },
+      { key: 'done', label: 'Completed' }, { key: 'trend', label: 'Trend vs prev' }, { key: 'cancelled', label: 'Cancelled' },
+      { key: 'overdue', label: 'Overdue' }, { key: 'unread', label: 'Unread' }]
+  }));
   wireBranchTableNav('#analyticsBody');   // each column routes to its own page, scoped to that branch
 }
 
@@ -1175,7 +1231,7 @@ async function initPoster() {
         sizeSlider.value = 100; sizeSlider.disabled = false; clearBtn.disabled = false;
         renderNow();
       };
-      img.onerror = () => alert('Could not read that image. Please upload a PNG/JPG.');
+      img.onerror = () => toast('Could not read that image. Please upload a PNG/JPG.');
       img.src = reader.result;
     };
     reader.readAsDataURL(file); fileInput.value = '';
@@ -1629,26 +1685,26 @@ function wireModelVariants(root = '#modelsList') {
     e.preventDefault();
     const modelId = form.dataset.model;
     const { name, colorHex } = readColour(form);
-    if (!name) { alert('Please choose a colour.'); return; }
+    if (!name) { toast('Please choose a colour.'); return; }
     try {
       await API.addVariant(modelId, { name, colorHex });
       await refreshModel(modelId); toast('Colour added.');
-    } catch (ex) { alert('Add colour failed: ' + ex.message + ' (Is the model_variants table set up?)'); }
+    } catch (ex) { toast('Add colour failed: ' + ex.message + ' (Is the model_variants table set up?)'); }
   }));
   $$(`${root} .var-edit`).forEach(form => form.addEventListener('submit', async e => {
     e.preventDefault();
     const modelId = form.closest('.var-row').dataset.model;
     const { name, colorHex } = readColour(form);
-    if (!name) { alert('Please choose a colour.'); return; }
+    if (!name) { toast('Please choose a colour.'); return; }
     try {
       await API.updateVariant(form.dataset.id, { name, colorHex });
       await refreshModel(modelId); toast('Colour saved.');
-    } catch (ex) { alert('Save failed: ' + ex.message); }
+    } catch (ex) { toast('Save failed: ' + ex.message); }
   }));
   $$(`${root} .var-del`).forEach(b => b.addEventListener('click', async () => {
     if (!(await confirmAction('Delete this colour and its photos?', { title: 'Delete colour', confirmLabel: 'Delete', danger: true }))) return;
     try { await API.deleteVariant(b.dataset.id); await refreshModel(b.dataset.model); toast('Colour deleted.'); }
-    catch (ex) { alert('Delete failed: ' + ex.message); }
+    catch (ex) { toast('Delete failed: ' + ex.message); }
   }));
   $$(`${root} .vp-add`).forEach(b => b.addEventListener('click', () => {
     MP_TARGET = b.dataset.model; MP_VARIANT = b.dataset.vid; $('#modelPhotoInput').click();
@@ -1657,7 +1713,7 @@ function wireModelVariants(root = '#modelsList') {
     if (!(await confirmAction('Delete this photo?', { title: 'Delete photo', confirmLabel: 'Delete', danger: true }))) return;
     b.disabled = true;
     try { await API.deleteModelPhoto(b.dataset.id, b.dataset.path); await refreshModel(b.dataset.model); }
-    catch (ex) { alert('Delete failed: ' + ex.message); b.disabled = false; }
+    catch (ex) { toast('Delete failed: ' + ex.message); b.disabled = false; }
   }));
 }
 
@@ -1674,7 +1730,7 @@ function wireModelReorder(root = '#modelsList') {
     try {
       for (let i = 0; i < ids.length; i++) await API.upsertModelMeta(ids[i], { sort: i });
       await renderModels();
-    } catch (ex) { alert('Reorder failed: ' + ex.message); await renderModels(); }
+    } catch (ex) { toast('Reorder failed: ' + ex.message); await renderModels(); }
   }));
 }
 
@@ -1688,7 +1744,7 @@ function wireModelPhotos(root = '#modelsList') {
     if (!(await confirmAction('Delete this photo?', { title: 'Delete photo', confirmLabel: 'Delete', danger: true }))) return;
     const id = modelOf(b); b.disabled = true;
     try { await API.deleteModelPhoto(b.dataset.id, b.dataset.path); await refreshModel(id); }
-    catch (e) { alert('Delete failed: ' + e.message); b.disabled = false; }
+    catch (e) { toast('Delete failed: ' + e.message); b.disabled = false; }
   }));
   $$(`${root} .mp-mv`).forEach(b => b.addEventListener('click', async () => {
     const id = modelOf(b), ids = (MODEL_PHOTOS[id] || []).filter(p => !p.variant_id).map(p => p.id);
@@ -1696,7 +1752,7 @@ function wireModelPhotos(root = '#modelsList') {
     if (j < 0 || j >= ids.length) return;
     [ids[idx], ids[j]] = [ids[j], ids[idx]];
     try { await API.reorderModelPhotos(ids); await refreshModel(id); }
-    catch (e) { alert('Failed: ' + e.message); }
+    catch (e) { toast('Failed: ' + e.message); }
   }));
   // drag-to-reorder each model's photo grid
   $$(`${root} .mp-block`).forEach(block => {
@@ -1704,7 +1760,7 @@ function wireModelPhotos(root = '#modelsList') {
     makeSortable(grid, async ids => {
       grid.style.opacity = '.5';
       try { await API.reorderModelPhotos(ids); await refreshModel(id); }
-      catch (e) { alert('Reorder failed: ' + e.message); grid.style.opacity = ''; }
+      catch (e) { toast('Reorder failed: ' + e.message); grid.style.opacity = ''; }
     });
   });
 }
@@ -1792,25 +1848,25 @@ function wireModelForms(root = '#modelsList') {
       };
       const ok = el.querySelector('.form-ok');
       try { await API.upsertModelMeta(el.dataset.id, patch); ok.classList.remove('hidden'); await refreshModel(el.dataset.id); }
-      catch (ex) { alert('Save failed: ' + ex.message + ' (Is the model_meta table set up?)'); }
+      catch (ex) { toast('Save failed: ' + ex.message + ' (Is the model_meta table set up?)'); }
     });
   });
   // base model → soft-delete via the hidden flag (removed from store + list, restorable below)
   $$(`${root} .remove-model`).forEach(b => b.addEventListener('click', async () => {
     if (!(await confirmAction(`Delete "${b.dataset.name || 'this model'}"? It's removed from the store. You can restore it from the Archive.`, { title: 'Delete model', confirmLabel: 'Delete', danger: true }))) return;
     try { await API.upsertModelMeta(b.dataset.id, { hidden: true }); await renderModels(); }
-    catch (ex) { alert('Failed: ' + ex.message); }
+    catch (ex) { toast('Failed: ' + ex.message); }
   }));
   // restore a soft-deleted model
   $$(`${root} .restore-model`).forEach(b => b.addEventListener('click', async () => {
     try { await API.upsertModelMeta(b.dataset.id, { hidden: false }); await renderModels(); }
-    catch (ex) { alert('Failed: ' + ex.message); }
+    catch (ex) { toast('Failed: ' + ex.message); }
   }));
   // custom model → permanent delete (its meta row is the only place it exists)
   $$(`${root} .del-model`).forEach(b => b.addEventListener('click', async () => {
     if (!(await confirmAction(`Permanently delete "${b.dataset.name || 'this model'}"? This can't be undone.`, { title: 'Delete permanently', confirmLabel: 'Delete', danger: true }))) return;
     try { await API.deleteModelMeta(b.dataset.id); await renderModels(); }
-    catch (ex) { alert('Failed: ' + ex.message); }
+    catch (ex) { toast('Failed: ' + ex.message); }
   }));
 }
 
@@ -2195,7 +2251,7 @@ async function paintConversation() {
     if (!body) return;
     inp.value = '';
     try { await API.sendMessage(userId, 'staff', body); await refreshConversation(userId); }
-    catch (ex) { alert('Send failed: ' + ex.message); }
+    catch (ex) { toast('Send failed: ' + ex.message); }
   });
   clearInterval(INBOX_POLL);
   INBOX_POLL = setInterval(() => {
@@ -2894,27 +2950,27 @@ function wireRepairRows() {
     if (!(await confirmAction(`Mark this repair as “${b.dataset.next}”?`, { title: 'Update status', confirmLabel: `Mark ${b.dataset.next}` }))) return;
     b.disabled = true;
     try { await API.updateRepairStatus(b.dataset.id, b.dataset.next); await renderRepairs(); }
-    catch (e) { alert('Failed: ' + e.message); b.disabled = false; }
+    catch (e) { toast('Failed: ' + e.message); b.disabled = false; }
   }));
   $$('#repRows .rep-reopen').forEach(b => b.addEventListener('click', async () => {
     if (!(await confirmAction('Re-open this repair? It moves back to Scheduled.', { title: 'Re-open repair', confirmLabel: 'Re-open' }))) return;
     b.disabled = true;
     try { await API.updateRepairStatus(b.dataset.id, 'pending'); await renderRepairs(); }
-    catch (e) { alert('Failed: ' + e.message); b.disabled = false; }
+    catch (e) { toast('Failed: ' + e.message); b.disabled = false; }
   }));
   // Cancel = keep the record (status 'cancelled') so it still counts in reports.
   $$('#repRows .rep-cancel').forEach(b => b.addEventListener('click', async () => {
     if (!(await confirmAction('Cancel this repair? It stays in the history as cancelled.', { title: 'Cancel repair', confirmLabel: 'Cancel repair', danger: true }))) return;
     b.disabled = true;
     try { await API.updateRepairStatus(b.dataset.id, 'cancelled'); await renderRepairs(); }
-    catch (e) { alert('Failed: ' + e.message); b.disabled = false; }
+    catch (e) { toast('Failed: ' + e.message); b.disabled = false; }
   }));
   $$('#repRows .rep-del').forEach(b => b.addEventListener('click', async () => {
     const soft = API.trashReady();
     if (!(await confirmAction(soft ? 'Move this repair record to the Trash Bin? You can restore it later.' : 'Delete this repair record? This cannot be undone.', { title: soft ? 'Move to Trash' : 'Delete repair', confirmLabel: soft ? 'Move to Trash' : 'Delete', danger: true }))) return;
     b.disabled = true;
     try { await API.deleteRepair(b.dataset.id, b.dataset.label || 'a repair'); await renderRepairs(); }
-    catch (e) { alert('Delete failed: ' + e.message); b.disabled = false; }
+    catch (e) { toast('Delete failed: ' + e.message); b.disabled = false; }
   }));
   $$('#repRows .rep-edit').forEach(b => b.addEventListener('click', () => { const r = byId(b.dataset.id); if (r) openRepairEditor(r); }));
   $$('#repRows .rep-msg').forEach(b => b.addEventListener('click', () => { INBOX_OPEN = b.dataset.user; showView('inbox'); }));
@@ -3195,7 +3251,7 @@ async function renderStorePhotos() {
       b.disabled = true;
       const id = b.closest('.photo-item').dataset.id;
       try { await API.deleteStorePhoto(id, b.dataset.path); await renderStorePhotos(); }
-      catch (e) { alert('Delete failed: ' + e.message); b.disabled = false; }
+      catch (e) { toast('Delete failed: ' + e.message); b.disabled = false; }
     }));
     $$('#photoList .mv').forEach(b => b.addEventListener('click', async () => {
       const id = b.closest('.photo-item').dataset.id;
@@ -3507,11 +3563,11 @@ function wireTrash() {
     if (e.target.closest('.tr-restore')) {
       if (!(await confirmAction(`Restore "${label}"?`, { title: 'Restore', confirmLabel: 'Restore' }))) return;
       try { await API.restoreItem(kind, id, label); toast('Restored.'); await renderTrash(); await refreshAfterTrash(kind); }
-      catch (ex) { alert('Restore failed: ' + ex.message); }
+      catch (ex) { toast('Restore failed: ' + ex.message); }
     } else if (e.target.closest('.tr-purge')) {
       if (!(await confirmAction(`Permanently delete "${label}"? This cannot be undone.`, { title: 'Delete forever', confirmLabel: 'Delete forever', danger: true }))) return;
       try { await API.purgeItem(kind, id, label); toast('Permanently deleted.'); await renderTrash(); }
-      catch (ex) { alert('Delete failed: ' + ex.message); }
+      catch (ex) { toast('Delete failed: ' + ex.message); }
     }
   });
 }

@@ -1227,7 +1227,7 @@ body.location-open main > section:not(#location) { display: none; }
 
 /* "message the branch" call-to-action on the schedule panel */
 .msg-cta { background: var(--mist); border-radius: var(--r-sm); padding: .6rem .8rem; font-size: .9rem; margin-bottom: 1rem; }
-.link-btn { background: none; border: 0; color: var(--red); font-weight: 700; cursor: pointer; font: inherit; padding: 0; }
+.link-btn { background: none; border: 0; color: var(--accent); font-weight: 700; cursor: pointer; font: inherit; padding: 0; }
 .link-btn:hover { text-decoration: underline; }
 
 /* ============ multiple contact numbers ============ */
@@ -1486,6 +1486,10 @@ body.logged-in .drawer-link.member-only { display: flex; }
 body.logged-in .notif.member-only { display: block; }
 body.logged-in .member-menu.member-only { display: block; }
 body.logged-in .guest-only { display: none; }
+/* hide the 4/3/2-Wheels quick links once signed in (Products stays) */
+body.logged-in .drawer-navlink[data-cat="4-wheels"],
+body.logged-in .drawer-navlink[data-cat="3-wheels"],
+body.logged-in .drawer-navlink[data-cat="2-wheels"] { display: none; }
 /* buttons styled as drawer links keep the list look */
 .drawer-nav button.drawer-link { width: 100%; text-align: left; background: none; font: inherit; cursor: pointer; }
 
@@ -1704,3 +1708,12 @@ body.logged-in .guest-only { display: none; }
 /* small inline label for the date field inside the add-unit grid */
 .mini-label{display:flex;flex-direction:column;font-size:.72rem;color:var(--muted);gap:.1rem}
 .mini-label input{font-size:.95rem;color:var(--ink)}
+/* analytics: toolbar, custom date range, % trend arrows */
+.ana-toolbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.ana-custom{display:flex;gap:.9rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem;padding:.7rem .9rem;border:1px solid var(--line);border-radius:10px;background:var(--accent-soft)}
+.ana-custom label{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted);gap:.2rem}
+.ana-custom input{font:inherit;padding:.4rem .5rem;border:1px solid var(--line);border-radius:8px}
+.trend{font-weight:700;white-space:nowrap}
+.trend.up{color:#16a34a}
+.trend.down{color:var(--red)}
+.trend.flat{color:var(--muted)}

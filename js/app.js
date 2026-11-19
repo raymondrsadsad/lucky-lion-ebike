@@ -1312,7 +1312,7 @@ async function wireMessages(user) {
     if (!body) return;
     inp.value = '';
     try { await API.sendMessage(user.id, 'customer', body); await refreshMessages(user, true); }
-    catch (ex) { alert('Send failed: ' + ex.message + ' (Is the messages table set up?)'); }
+    catch (ex) { toast('Send failed: ' + ex.message + ' (Is the messages table set up?)'); }
   });
   clearInterval(MSG_POLL);
   MSG_POLL = setInterval(() => {
@@ -1553,6 +1553,7 @@ async function panelProfile(user) {
       <label>Current password <input name="current" type="password" required /></label>
       <label>New password <input name="next" type="password" required minlength="8" pattern="(?=.*[A-Z])(?=.*\\d).{8,}" title="At least 8 characters, with one uppercase letter and one number." /></label>
       <p class="pw-hint">At least 8 characters, 1 uppercase letter and 1 number.</p>
+      <label class="checkbox chk-show"><input type="checkbox" id="pwShow" /> Show password</label>
       <p class="form-error hidden" id="pwErr"></p>
       <p class="form-ok hidden" id="pwOk">Password updated.</p>
       <button class="btn btn-success full" type="submit">Update password</button>
@@ -1585,6 +1586,10 @@ function wireProfile(user) {
     $('#memberName').textContent = `Hi, ${f.get('name') || user.username}`;
     updateMemberAvatar(user);
     toast('Profile saved.');
+  });
+  const pwShow = $('#pwShow');
+  if (pwShow) pwShow.addEventListener('change', () => {
+    $$('#pwForm input[type="password"], #pwForm input[data-pw]').forEach(i => { i.dataset.pw = '1'; i.type = pwShow.checked ? 'text' : 'password'; });
   });
   $('#pwForm').addEventListener('submit', async e => {
     e.preventDefault();
