@@ -2,7 +2,7 @@
 
 > Purpose: this file is the single source of truth for how the project works, so a fresh
 > session can skip re-exploring the codebase. **Keep it updated on every change.**
-> Last updated: 2026-11-19.
+> Last updated: 2026-11-20.
 
 ## What it is
 Static marketing + member site for **Lucky Lion eBike (Trece Martires, Cavite)**. Capstone
@@ -203,6 +203,43 @@ User can deploy Netlify only a few times but can run SQL freely → **build/veri
 - **Pending SQL:** run **`supabase/RUN-ALL-new-features.sql`** — a single combined file with all of it (variants+stock, pre-loved + its 1-of-1 unit columns `color/chassis_no/battery_no/motor_no/sold`, unit details+acquired date, messages). Re-running is safe (idempotent), so if you ran an earlier version just run it again for the new pre-loved columns. Individual files (`variants.sql`, `ebike-details.sql`, `preloved.sql`, `preloved-details.sql`, `unit-acquired.sql`, `messages.sql`) remain for reference. NOTE: adding a customer unit now always sends the new `user_ebikes` columns (incl. `acquired_at`), so `ebike-details.sql` **and** `unit-acquired.sql` must be run or unit-add fails.
 
 ## Recent changes log
+- 2026-11-20 (cvsu-tester-batch): **~30 CVSU tester revisions, ONE deploy, NO new SQL.** A CVSU IT
+  tester returned ~38 change-requests (34 distinct); cleared them without removing features, on git
+  branch `worktree-tester-revisions-nov2026` (4 commits). **No schema change** — all client-side
+  JS/CSS/data. Highlights:
+  - **Public (`index.html`/`app.js`):** signup now **First/Last name** (two inputs → the one `name`
+    column) + **+63 phone** (digits-only, capped 10, `localPhone`/`fullPhone`) and **does NOT
+    auto-login** (success toast → reopens login with username prefilled); `API.createUser` rejects
+    duplicate **email/phone** (not just username). **Products** drawer link opens the `#products`
+    page (`data-cat="all"`); **4/3/2-Wheels** quick links hidden once logged in (CSS
+    `body.logged-in .drawer-navlink[data-cat="…"]`; Products stays). New **search boxes** on Products
+    (`#productsSearch`, `PRODUCTS_Q`) and General Maintenance (`.mnt-search`). Member menu split:
+    **Schedule Repair** is booking-form-only; new **📑 Your Bookings** (`panelBookings`) and **⭐ My
+    Reviews** (`panelReviews`) panels. **In-progress** booking rows highlighted (`.rep-row.status-*`).
+    Product detail gained an **Inquire now** button → `openContactPicker('store')`. Booking **past
+    time-slots disabled** for today (`isPastSlot` in `paintSlots`). Profile phone uses the same +63
+    widget; profile change-password got a **Show password** toggle.
+  - **Staff/Admin (`staff.js`/`staff.html`):** **Repairs** — dropped the Scheduled/History count
+    badges; a **total-count line** sits below the toggle left-aligned ("8 open repairs" / "20 repairs
+    total"); **History now shows ALL** repairs (was done+cancelled). **FIX:** staff accounts now
+    render in Users (`staffRow`/`renderStaffList` — `staffRow` existed but was never called). **Admin
+    + branch password reset** via a **⚙ Options** menu on each user card (`API.resetPassword`, no
+    email). Create-User: First/Last name, +63 phone, **units hidden for staff role**. **FIX:** Poster
+    "Fill from model" now includes **custom models** (29 total). Add-model **required** fields + SRP
+    **7-digit, no decimals**; "Deleted models" → **🗄️ Archive**; "Sale note" → **Remarks**;
+    Date-acquired label on the Users-list add-unit; compact **Save** in Site Settings; `alert()` →
+    **toast** everywhere.
+  - **Analytics (`renderAnalytics`):** per-branch **% trend ▲/▼** (completed repairs vs the previous
+    equal-length period, new `analyticsWindow`/`prevWindow`/`trendCell`), a **Custom** calendar range
+    (From/To `#anaFrom`/`#anaTo`), and **Export** (Excel/PDF) reusing `exportControl`/`wireExport`.
+  - **Colour:** the red "Message/Call the branch" `.link-btn` → **blue** (`--accent`); destructive
+    stays red.
+  - **Verified** headless (Chromium, live Supabase): zero console errors across public + admin +
+    customer; all the above asserted in-DOM. Cache-bust **`20261120a`** (styles.css+api.js both;
+    app.js index; staff.js staff). `deploy/` synced (7 files, mirror verified) + `lucky-lion-site.zip`
+    rebuilt (index.html at root). Deliverables: `Lucky-Lion-Changes-BeforeAfter.pdf` (regenerated) +
+    a live checklist tracker (Artifact). **PENDING USER ACTION:** drag `lucky-lion-site.zip` to
+    Netlify. **No SQL this batch.** Deferred per owner: email recovery (H3), Terms & Conditions (H5).
 - 2026-11-19 (member-id): **Customer can view their Member ID again (Test Instrument row).** A past UI
   change had removed the member/customer ID from the customer account hero + profile sub, so the
   "Access to view Member ID" test-instrument row couldn't pass even though `API.createUser` still
