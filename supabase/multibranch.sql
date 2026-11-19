@@ -44,9 +44,10 @@ where coalesce(v.stock, 0) > 0
   and not exists (select 1 from variant_stock s where s.variant_id = v.id);
 
 
--- ========== 4) SEED THE FIRST ADMIN ==========
--- The boss logs in with this, then creates more admins/staff in the portal.
--- Change the password after first login.
+-- ========== 4) SEED THE ONE ADMIN ==========
+-- The boss logs in with this and creates staff/customers in the portal.
+-- There is exactly ONE admin: the app blocks creating a second admin account,
+-- so this seed row is the only administrator. Change the password after first login.
 insert into users (id, member_id, role, username, password, name, branch)
 values ('admin-1', 'ADMIN-01', 'admin', 'admin', 'admin123', 'Owner / Admin', null)
 on conflict (id) do nothing;

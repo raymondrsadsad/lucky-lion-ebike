@@ -2964,12 +2964,13 @@ function wireCreate() {
   const roleSel = $('#createForm [name="role"]'), branchSel = $('#createBranch');
   const createColorSlot = $('#createColorField'); if (createColorSlot) createColorSlot.innerHTML = colorLabelField('', '', false, '— colour —');
 
-  // Admins can create customers, staff and other admins; staff can only create customers.
+  // Admins can create customers and staff; staff can only create customers.
+  // There is exactly ONE admin (seeded in the database) — the app never creates another.
   roleSel.innerHTML = isAdmin()
-    ? `<option value="customer">Customer</option><option value="staff">Staff</option><option value="admin">Admin</option>`
+    ? `<option value="customer">Customer</option><option value="staff">Staff</option>`
     : `<option value="customer">Customer</option>`;
   $('#createRoleWrap').classList.toggle('hidden', !isAdmin());
-  if (isAdmin()) { $('#createTitle').textContent = 'Create User / Staff / Admin'; $('#createLead').textContent = 'Create a customer, a branch staff member, or another admin.'; }
+  if (isAdmin()) { $('#createTitle').textContent = 'Create User / Staff'; $('#createLead').textContent = 'Create a customer or a branch staff member.'; }
 
   // Branch: staff locked to their own; admins pick (hidden when creating another admin).
   const syncBranchField = () => {
