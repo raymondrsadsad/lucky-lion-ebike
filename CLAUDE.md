@@ -203,6 +203,15 @@ User can deploy Netlify only a few times but can run SQL freely → **build/veri
 - **Pending SQL:** run **`supabase/RUN-ALL-new-features.sql`** — a single combined file with all of it (variants+stock, pre-loved + its 1-of-1 unit columns `color/chassis_no/battery_no/motor_no/sold`, unit details+acquired date, messages). Re-running is safe (idempotent), so if you ran an earlier version just run it again for the new pre-loved columns. Individual files (`variants.sql`, `ebike-details.sql`, `preloved.sql`, `preloved-details.sql`, `unit-acquired.sql`, `messages.sql`) remain for reference. NOTE: adding a customer unit now always sends the new `user_ebikes` columns (incl. `acquired_at`), so `ebike-details.sql` **and** `unit-acquired.sql` must be run or unit-add fails.
 
 ## Recent changes log
+- 2026-11-19 (member-id): **Customer can view their Member ID again (Test Instrument row).** A past UI
+  change had removed the member/customer ID from the customer account hero + profile sub, so the
+  "Access to view Member ID" test-instrument row couldn't pass even though `API.createUser` still
+  generates `TRECE-C-0001`-style IDs correctly. Re-added `user.memberId` display in TWO customer spots
+  in `js/app.js`: the **account dashboard hero** (`renderAccountDashboard`, a 🪪 line under the branch)
+  and the **My Profile panel** (`panelProfile`, a 🪪 panel-sub). Staff/registry display was already
+  intact. **No SQL** (reuses the existing `member_id` column). Cache-bust **app.js `20261119c`→
+  `20261119d`** (index only; other assets unchanged). `deploy/` synced + zip rebuilt. app.js
+  parse-checked. **PENDING:** drag the zip to Netlify.
 - 2026-11-19 (merge-2): **Merged the admin-QA batch (9 items) in too — all three batches now on `main`.**
   Brought `changes/admin-fixes` (`f58fa8b`, the 9 change-request items incl. Trash Bin + Activity Log)
   into `main` on top of the enhancement + security merge. Conflicts were resolved **keeping every

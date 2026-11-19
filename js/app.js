@@ -1198,6 +1198,7 @@ async function renderAccountDashboard(user) {
         <span class="ah-eyebrow">My account</span>
         <strong>Hi, ${esc(user.name || user.username)}</strong>
         <span>${user.branch ? '📍 ' + nt(branchName(user.branch)) : ''}</span>
+        ${user.memberId ? `<span>🪪 Member ID: ${esc(user.memberId)}</span>` : ''}
         ${lastRepairHtml}
       </div>
     </div>
@@ -1478,6 +1479,7 @@ async function panelProfile(user) {
     : `<span class="avatar avatar-ph avatar-xl" id="profAvatar">${esc(((user.name || user.username || 'U').trim()[0] || 'U').toUpperCase())}</span>`;
   return `<h3 class="panel-title">My Profile</h3>
     <p class="panel-sub">${unitsText}</p>
+    ${user.memberId ? `<p class="panel-sub">🪪 Member ID: <strong>${esc(user.memberId)}</strong></p>` : ''}
     ${onboard ? `<div class="reminder-banner">👋 <strong>Welcome!</strong> Your password is set. Please complete your details below and add a profile photo.</div>` : ''}
     <div class="prof-photo">
       ${av}
